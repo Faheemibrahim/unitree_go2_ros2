@@ -8,11 +8,11 @@ pointcloud_to_laserscan:
     target_frame: base_footprint
     transform_tolerance: 0.1
 
-    # Band above the ground plane. The lidar sits ~0.19 m up, so 0.1 m clears
-    # ground returns from the shallow downward beams while staying under the
-    # 1 m tall obstacles in the world.
-    min_height: 0.1
-    max_height: 0.8
+    # Band above the ground plane. Measured in this frame the ground sits at
+    # about -0.05 m, so 0.25 m leaves margin for the body pitching as it walks
+    # before ground returns would register as obstacles.
+    min_height: 0.25
+    max_height: 1.1
 
     # Matches the sensor's 600 samples over a full revolution.
     angle_min: -3.14159
