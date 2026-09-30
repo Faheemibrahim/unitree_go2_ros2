@@ -87,6 +87,11 @@ def generate_launch_description():
     declare_disable_velodyne_lidar = DeclareLaunchArgument(
         "disable_velodyne_lidar", default_value="false", description="Leave out the Velodyne lidar"
     )
+    declare_disable_static_map_odom = DeclareLaunchArgument(
+        "disable_static_map_odom",
+        default_value="false",
+        description="Leave out the static map->odom transform, for when SLAM publishes it",
+    )
 
     # Description nodes and parameters
     description_command = Command([
@@ -191,6 +196,7 @@ def generate_launch_description():
             '--roll', '0', '--pitch', '0', '--yaw', '0',
             '--frame-id', 'map', '--child-frame-id', 'odom'
         ],
+        condition=UnlessCondition(LaunchConfiguration("disable_static_map_odom")),
     )
 
     rviz2 = Node(
@@ -356,6 +362,7 @@ def generate_launch_description():
             declare_disable_d455,
             declare_disable_lidar_l1,
             declare_disable_velodyne_lidar,
+            declare_disable_static_map_odom,
 
             # Parameters
             SetParameter(name="use_sim_time", value=use_sim_time),
