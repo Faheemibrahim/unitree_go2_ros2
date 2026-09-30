@@ -1,0 +1,29 @@
+pointcloud_to_laserscan:
+  ros__parameters:
+    use_sim_time: true
+
+    # Flatten into the gravity-aligned ground frame, not the sensor frame: the L1
+    # is mounted at roll 165 deg / yaw 90 deg, so a height band only means
+    # "above the ground" after this transform.
+    target_frame: base_footprint
+    transform_tolerance: 0.1
+
+    # Band above the ground plane. The lidar sits ~0.19 m up, so 0.1 m clears
+    # ground returns from the shallow downward beams while staying under the
+    # 1 m tall obstacles in the world.
+    min_height: 0.1
+    max_height: 0.8
+
+    # Matches the sensor's 600 samples over a full revolution.
+    angle_min: -3.14159
+    angle_max: 3.14159
+    angle_increment: 0.01047
+    scan_time: 0.1
+
+    # The sensor's own limits, from lidar_4D_lidar.xacro.
+    range_min: 0.8
+    range_max: 30.0
+
+    use_inf: true
+    inf_epsilon: 1.0
+    queue_size: 10

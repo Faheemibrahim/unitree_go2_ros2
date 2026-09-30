@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>unitree_go2_navigation</name>
+  <version>0.0.0</version>
+  <description>Navigation and mapping for the unitree go2 robot</description>
+  <maintainer email="khaledgabr77@gmail.com">khaled</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>launch_ros</build_depend>
+
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>unitree_go2_sim</exec_depend>
+  <exec_depend>pointcloud_to_laserscan</exec_depend>
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
