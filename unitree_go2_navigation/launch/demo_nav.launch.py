@@ -41,21 +41,26 @@ def generate_launch_description():
     declare_gui = DeclareLaunchArgument(
         "gui", default_value="true", description="Use the Gazebo gui"
     )
+    # Off by default. Starting RViz from this launch file saturates DDS
+    # discovery on this setup: /clock stops being delivered to ROS even though
+    # Gazebo keeps running, and Nav2 never activates. A delay makes it less
+    # likely but not reliable - it was seen to work once and fail on the next
+    # run with the same timing. Starting RViz by hand, after the stack is up,
+    # was reliable, so that is what the README and the setup guide tell you to
+    # do. Set rviz:=true to start it from here anyway.
     declare_rviz = DeclareLaunchArgument(
-        "rviz", default_value="true", description="Launch rviz with the Nav2 view"
+        "rviz", default_value="false", description="Launch rviz with the Nav2 view"
     )
     declare_rviz_delay = DeclareLaunchArgument(
         "rviz_delay",
         default_value="45.0",
-        description="Seconds before RViz starts. Starting RViz at the same "
-        "time as the rest of the stack saturates DDS discovery here and "
-        "/clock stops being delivered, which blocks Nav2 activation; "
-        "bringing it up once everything else is settled avoids that.",
+        description="Seconds before RViz starts, when rviz:=true",
     )
     declare_nav2_delay = DeclareLaunchArgument(
         "nav2_delay",
-        default_value="25.0",
-        description="Seconds to wait for Gazebo to spawn the robot before Nav2 starts",
+        default_value="40.0",
+        description="Seconds to wait for Gazebo to spawn the robot and settle "
+        "before Nav2 starts",
     )
     # Stub for a later phase. Nav2 consumes odom->base_footprint without caring
     # who publishes it, so swapping in FAST-LIO/Point-LIO should not require any

@@ -55,11 +55,16 @@ def generate_launch_description():
     declare_rviz = DeclareLaunchArgument(
         "rviz", default_value="true", description="Launch rviz"
     )
+    # 40 s, not 25: Gazebo is still loading controllers at 25 s, and the CPU
+    # contention made Nav2's lifecycle service calls time out. The nodes
+    # configured fine but their replies were dropped, so lifecycle_manager
+    # reported "Failed to bring up all requested nodes" and aborted.
     declare_nav2_delay = DeclareLaunchArgument(
         "nav2_delay",
-        default_value="25.0",
-        description="Seconds to wait for Gazebo to spawn the robot before "
-        "bringing up Nav2, so the costmaps find a complete TF tree",
+        default_value="40.0",
+        description="Seconds to wait for Gazebo to spawn the robot and settle "
+        "before bringing up Nav2, so the costmaps find a complete TF tree and "
+        "the lifecycle service calls are not starved",
     )
 
     # Whatever provides map->odom (slam_toolbox or AMCL) owns it, so the sim
