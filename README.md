@@ -8,6 +8,11 @@
 
 This package provides a complete ROS 2 Jazzy integration for the Unitree Go2 quadrupedal robot using the CHAMP controller framework. It includes custom configuration packages and robot description models specifically adapted for ROS 2, enabling simulation, control, and autonomous operation capabilities.
 
+> **New to ROS, or rebuilding this from scratch?** Read
+> [docs/NAV2_SETUP_GUIDE.md](docs/NAV2_SETUP_GUIDE.md) instead. It walks through
+> every step in the order it was built, explains each setting and why it has the
+> value it does, and lists the problems we hit and how they were fixed.
+
 ## Quick start: navigation demo
 
 From a fresh container (`~/go2_docker/run.sh`), inside the container:
@@ -20,9 +25,16 @@ ros2 launch unitree_go2_navigation demo_nav.launch.py
 ```
 
 That one command starts Gazebo, AMCL on the saved map of the default
-world, Nav2, and an RViz view already set up for navigation.
+world, and Nav2. RViz is **not** started by it — see
+[Known limitations](#known-limitations) — start it by hand once the stack is
+up:
 
-**Wait 60-90 seconds before doing anything.** Gazebo has to spawn the
+```bash
+rviz2 -d ~/ws/install/unitree_go2_navigation/share/unitree_go2_navigation/rviz/nav2_go2.rviz \
+  --ros-args -p use_sim_time:=true
+```
+
+**Wait 90-120 seconds before doing anything.** Gazebo has to spawn the
 robot and the controllers have to come up; errors printed during that
 window are normal. The stack is ready when `/clock` is advancing,
 `/joint_states`, `/odom` and `/scan` are publishing, and
@@ -47,7 +59,7 @@ Goal points worth trying in the default world (obstacles sit at
 
 A successful run: the robot walks a smooth path, the global plan is
 redrawn when something blocks it, the action returns `SUCCEEDED`, and the
-robot ends up near the goal. Expect it to stop **0.3-1.5 m** from the
+robot ends up near the goal. Expect it to stop **0.3-2.1 m** from the
 requested point - see [Known limitations](#known-limitations).
 
 To map a new world instead of localizing on the saved one:
@@ -58,8 +70,8 @@ ros2 run nav2_map_server map_saver_cli -f ~/ws/my_map   # when done
 ```
 
 Useful arguments: `mode:=slam|localization`, `map:=/path/to/map.yaml`,
-`gui:=false`, `rviz:=false`, `odom_source:=ekf|lio` (only `ekf` is
-implemented).
+`gui:=false`, `rviz:=true` (not recommended), `odom_source:=ekf|lio`
+(only `ekf` is implemented).
 
 ## About Unitree Go2
 
@@ -313,7 +325,7 @@ over.
 **Localization accuracy is poor in the default world.** The world contains
 only five small obstacles, so AMCL has very little to match against and
 the robot typically stops **0.3-1.5 m** from the requested goal, with the
-larger errors when it travels through unmapped space. Nav2 reports
+larger errors (up to 2.1 m seen) when it travels through unmapped space. Nav2 reports
 `SUCCEEDED` because it believes it arrived. A world with walls would fix
 this; the navigation stack itself is not at fault.
 
@@ -323,11 +335,13 @@ against the robot are invisible. Costmap inflation is set to 0.70 m to
 compensate, but do not expect reliable avoidance of something that walks
 into the robot.
 
-**Starting RViz at the same time as the rest of the stack breaks it.** DDS
-discovery saturates, `/clock` stops being delivered to ROS even though
-Gazebo keeps running, and Nav2 never activates. `demo_nav.launch.py`
-therefore starts RViz on a timer (`rviz_delay`, default 45 s). If you
-start RViz yourself, wait until the stack is up.
+**Starting RViz from the launch file breaks the stack.** DDS discovery
+saturates, `/clock` stops being delivered to ROS even though Gazebo keeps
+running, and Nav2 never activates. Delaying RViz by 45 s made this
+intermittent rather than fixing it, so `demo_nav.launch.py` now defaults
+to `rviz:=false`. Start RViz by hand once the stack is up, which was
+reliable in testing. If `/clock` is already lost, closing RViz does not
+recover it - restart the stack.
 
 **MPPI is too slow here.** It could not hold its 20 Hz control rate
 alongside Gazebo (measured ~5.5 Hz) and commanded only ~0.06 m/s, which
