@@ -1,5 +1,9 @@
 # Nav2 Setup Guide — rebuilding this from scratch
 
+> **If you are trying to understand the code rather than rebuild it, read
+> [STAGE_BY_STAGE.md](STAGE_BY_STAGE.md) first.** It explains the robot as it
+> came, then each layer added on top, and where every file came from.
+
 This guide rebuilds the navigation work in this repository from nothing, in the
 order it was actually built. It is written for someone who has **never used
 ROS**. Every term is defined in the [Glossary](#7-glossary), every command can
@@ -224,9 +228,10 @@ git log --reverse --oneline 55ff151..HEAD
 
 > **A note on two large files.** `config/nav2_params.yaml` (428 lines) and
 > `rviz/nav2_go2.rviz` (603 lines) were **copied from the installed
-> `nav2_bringup` package** and then edited. Reproducing all 1,031 lines here
-> would not help you. For those two, this guide gives you the copy command and
-> then the exact edits. Every other file is shown in full.
+> `nav2_bringup` package**. Reproducing all 1,031 lines here would not help
+> you. `nav2_params.yaml` was then edited, and this guide gives the exact
+> edits. `nav2_go2.rviz` was **not** edited at all — it is identical to the
+> original. Every other file is shown in full.
 
 ---
 
@@ -1382,16 +1387,20 @@ pre-configured RViz view, so a demo needs no setup.
 `unitree_go2_navigation/rviz/nav2_go2.rviz` (603 lines)
 **File changed:** `unitree_go2_navigation/CMakeLists.txt`
 
-Get the RViz view file by copying Nav2's and pointing the camera at the dog's
-frame:
+Get the RViz view file by copying Nav2's. **It is used exactly as it comes** —
+its fixed frame is already `map`, which is right for this robot:
 
 ```bash
 mkdir -p ~/ws/src/unitree_go2_ros2/unitree_go2_navigation/rviz
 cp /opt/ros/jazzy/share/nav2_bringup/rviz/nav2_default_view.rviz \
    ~/ws/src/unitree_go2_ros2/unitree_go2_navigation/rviz/nav2_go2.rviz
-sed -i 's/Target Frame: base_link/Target Frame: base_footprint/' \
-   ~/ws/src/unitree_go2_ros2/unitree_go2_navigation/rviz/nav2_go2.rviz
 ```
+
+> An earlier version of this guide said a `sed` command here "pointed the
+> camera at the dog's frame". That was wrong: the stock file never contained
+> the text it searched for, so it changed nothing. You can confirm the file is
+> unchanged with
+> `diff /opt/ros/jazzy/share/nav2_bringup/rviz/nav2_default_view.rviz ~/ws/src/unitree_go2_ros2/unitree_go2_navigation/rviz/nav2_go2.rviz`.
 
 And add it to `CMakeLists.txt`:
 
@@ -2268,6 +2277,6 @@ unitree_go2_ros2/
     │   └── default_world.yaml       Its scale, origin and thresholds
     │
     └── rviz/
-        └── nav2_go2.rviz            RViz layout for navigation, copied from
-                                     nav2_bringup and pointed at base_footprint
+        └── nav2_go2.rviz            RViz layout for navigation, copied unchanged
+                                     from nav2_bringup
 ```
