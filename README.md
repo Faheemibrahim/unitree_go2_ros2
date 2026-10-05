@@ -8,10 +8,15 @@
 
 This package provides a complete ROS 2 Jazzy integration for the Unitree Go2 quadrupedal robot using the CHAMP controller framework. It includes custom configuration packages and robot description models specifically adapted for ROS 2, enabling simulation, control, and autonomous operation capabilities.
 
-> **New to ROS, or rebuilding this from scratch?** Read
-> [docs/NAV2_SETUP_GUIDE.md](docs/NAV2_SETUP_GUIDE.md) instead. It walks through
-> every step in the order it was built, explains each setting and why it has the
-> value it does, and lists the problems we hit and how they were fixed.
+> **New to ROS?** Two documents, in this order:
+>
+> 1. [docs/STAGE_BY_STAGE.md](docs/STAGE_BY_STAGE.md) — **understand it.** The
+>    robot as it came, then each layer added on top (lidar to `/scan`, SLAM,
+>    AMCL, Nav2), and for every file whether it was written, copied from an
+>    installed ROS package, or edited — with the exact changes and why.
+> 2. [docs/NAV2_SETUP_GUIDE.md](docs/NAV2_SETUP_GUIDE.md) — **rebuild it.**
+>    Every commit in order with full file contents, plus the problems we hit
+>    and how they were fixed.
 
 ## Quick start: navigation demo
 
