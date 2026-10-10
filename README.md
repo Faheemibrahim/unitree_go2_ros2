@@ -75,8 +75,11 @@ ros2 run nav2_map_server map_saver_cli -f ~/ws/my_map   # when done
 ```
 
 Useful arguments: `mode:=slam|localization`, `map:=/path/to/map.yaml`,
-`gui:=false`, `rviz:=true` (not recommended), `odom_source:=ekf|lio`
-(only `ekf` is implemented).
+`world:=/path/to/world.sdf`, `gui:=false`, `rviz:=true` (not recommended),
+`odom_source:=ekf|lio` (only `ekf` is implemented).
+
+For the maze world (`maze.sdf`, map `maze_world2`), including manual mapping with teleop and
+paste-ready navigation commands, see [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## About Unitree Go2
 
