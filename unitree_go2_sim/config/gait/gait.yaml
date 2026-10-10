@@ -3,7 +3,11 @@
     gait:
       knee_orientation : ">>"
       pantograph_leg : false
-      odom_scaler: 0.9
+      # Calibrated against /odom/ground_truth in the open default world: at 0.9
+      # the leg odometry reported only ~68% of the distance walked (CHAMP zeroes
+      # velocity whenever all four feet are down), which made AMCL fall behind
+      # and lose the robot in the maze. 0.9 / 0.68 = 1.32.
+      odom_scaler: 1.32
       max_linear_velocity_x : 0.3
       max_linear_velocity_y : 0.25
       max_angular_velocity_z : 0.5
