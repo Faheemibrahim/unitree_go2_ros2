@@ -28,7 +28,9 @@ slam_toolbox:
     # sensor cannot produce.
     min_laser_range: 0.8
     max_laser_range: 30.0
-    minimum_time_interval: 0.5
+    # 0.5 would cap processing at 2 scans/s against a 10 Hz lidar, which would
+    # override the travel thresholds below and starve matching in tight corridors.
+    minimum_time_interval: 0.2
     transform_timeout: 0.2
     tf_buffer_duration: 30.0
     stack_size_to_use: 40000000
@@ -37,10 +39,15 @@ slam_toolbox:
     # General Parameters
     use_scan_matching: true
     use_scan_barycenter: true
-    minimum_travel_distance: 0.5
-    minimum_travel_heading: 0.5
+    # Tuned for the maze's ~1.7 m corridors and constant 90 deg turns. At the
+    # stock 0.5 / 0.5 the robot could round a whole corner on ~3 scans, leaving
+    # consecutive scans too dissimilar to match.
+    minimum_travel_distance: 0.15
+    minimum_travel_heading: 0.2
     check_min_dist_and_heading_precisely: false
-    scan_buffer_size: 10
+    # Raised with the thresholds above: at 0.15 m spacing, 10 scans would span
+    # only ~1.5 m, too short a local map for the matcher to work against.
+    scan_buffer_size: 30
     scan_buffer_maximum_scan_distance: 10.0
     link_match_minimum_response_fine: 0.1
     link_scan_maximum_distance: 1.5
