@@ -23,6 +23,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 
 def generate_launch_description():
     unitree_go2_sim = get_package_share_directory("unitree_go2_sim")
+    unitree_go2_description = get_package_share_directory("unitree_go2_description")
     unitree_go2_navigation = get_package_share_directory("unitree_go2_navigation")
     nav2_bringup = get_package_share_directory("nav2_bringup")
 
@@ -34,6 +35,7 @@ def generate_launch_description():
     )
     nav2_params = os.path.join(unitree_go2_navigation, "config", "nav2_params.yaml")
     default_map = os.path.join(unitree_go2_navigation, "maps", "default_world.yaml")
+    default_world = os.path.join(unitree_go2_description, "worlds", "default.sdf")
 
     mode = LaunchConfiguration("mode")
     is_slam = PythonExpression(["'", mode, "' == 'slam'"])
@@ -48,6 +50,11 @@ def generate_launch_description():
         "map",
         default_value=default_map,
         description="Map yaml to localise against (mode:=localization only)",
+    )
+    declare_world = DeclareLaunchArgument(
+        "world",
+        default_value=default_world,
+        description="Gazebo world sdf path to forward to the sim",
     )
     declare_gui = DeclareLaunchArgument(
         "gui", default_value="true", description="Use the Gazebo gui"
@@ -76,6 +83,7 @@ def generate_launch_description():
         launch_arguments={
             "gui": LaunchConfiguration("gui"),
             "rviz": LaunchConfiguration("rviz"),
+            "world": LaunchConfiguration("world"),
             "disable_static_map_odom": "true",
         }.items(),
     )
@@ -128,6 +136,17 @@ def generate_launch_description():
             ],
         ),
         condition=IfCondition(is_slam),
+    )
+
+    # Gives obstacles that are not in the saved map an assumed size for the global
+    # planner. Localization only: in SLAM mode the map is still being built.
+    unmapped_obstacle_marker = Node(
+        package="unitree_go2_navigation",
+        executable="unmapped_obstacle_marker.py",
+        name="unmapped_obstacle_marker",
+        output="screen",
+        parameters=[{"use_sim_time": True}],
+        condition=UnlessCondition(is_slam),
     )
 
     localization = IncludeLaunchDescription(
@@ -199,11 +218,13 @@ def generate_launch_description():
         [
             declare_mode,
             declare_map,
+            declare_world,
             declare_gui,
             declare_rviz,
             declare_nav2_delay,
             sim,
             pointcloud_to_laserscan_node,
+            unmapped_obstacle_marker,
             slam_toolbox_node,
             configure_slam_toolbox,
             activate_slam_toolbox,

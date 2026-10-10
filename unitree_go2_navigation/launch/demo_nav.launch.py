@@ -19,9 +19,11 @@ from launch.substitutions import LaunchConfiguration, PythonExpression
 
 
 def generate_launch_description():
+    unitree_go2_description = get_package_share_directory("unitree_go2_description")
     unitree_go2_navigation = get_package_share_directory("unitree_go2_navigation")
 
     default_map = os.path.join(unitree_go2_navigation, "maps", "default_world.yaml")
+    default_world = os.path.join(unitree_go2_description, "worlds", "default.sdf")
     rviz_config = os.path.join(unitree_go2_navigation, "rviz", "nav2_go2.rviz")
 
     mode = LaunchConfiguration("mode")
@@ -37,6 +39,11 @@ def generate_launch_description():
         "map",
         default_value=default_map,
         description="Map yaml to localise against (mode:=localization only)",
+    )
+    declare_world = DeclareLaunchArgument(
+        "world",
+        default_value=default_world,
+        description="Gazebo world sdf path to forward to the sim",
     )
     declare_gui = DeclareLaunchArgument(
         "gui", default_value="true", description="Use the Gazebo gui"
@@ -98,6 +105,7 @@ def generate_launch_description():
         launch_arguments={
             "mode": mode,
             "map": LaunchConfiguration("map"),
+            "world": LaunchConfiguration("world"),
             "gui": LaunchConfiguration("gui"),
             "rviz": "false",
             "nav2_delay": LaunchConfiguration("nav2_delay"),
@@ -119,6 +127,7 @@ def generate_launch_description():
         [
             declare_mode,
             declare_map,
+            declare_world,
             declare_gui,
             declare_rviz,
             declare_nav2_delay,

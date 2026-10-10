@@ -1,9 +1,13 @@
 amcl:
   ros__parameters:
-    alpha1: 0.2
-    alpha2: 0.2
-    alpha3: 0.2
-    alpha4: 0.2
+    # Tuned for the maze's 1.6 m corridors, where AMCL must stay within ~0.2 m.
+    # alpha1-4 lowered from 0.2: odometry is now calibrated to within ~3%
+    # (odom_scaler in unitree_go2_sim gait.yaml), so trusting it more stops the
+    # particles spreading along featureless corridors.
+    alpha1: 0.1
+    alpha2: 0.1
+    alpha3: 0.1
+    alpha4: 0.1
     alpha5: 0.2
     base_frame_id: "base_footprint"
     beam_skip_distance: 0.5
@@ -13,10 +17,11 @@ amcl:
     global_frame_id: "map"
     lambda_short: 0.1
     laser_likelihood_max_dist: 2.0
-    laser_max_range: 100.0
-    laser_min_range: -1.0
+    # The L1's real limits (lidar_4D_lidar.xacro).
+    laser_max_range: 30.0
+    laser_min_range: 0.8
     laser_model_type: "likelihood_field"
-    max_beams: 60
+    max_beams: 180
     max_particles: 2000
     min_particles: 500
     odom_frame_id: "odom"
@@ -27,14 +32,20 @@ amcl:
     resample_interval: 1
     robot_model_type: "nav2_amcl::DifferentialMotionModel"
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    # The map matches the real walls to ~2.5 cm, so score scans more sharply.
+    sigma_hit: 0.15
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.2
-    update_min_d: 0.25
-    z_hit: 0.5
+    # Correct every 10 cm / 0.1 rad instead of 25 cm / 0.2 rad, so the estimate
+    # cannot fall far behind before the next scan update.
+    update_min_a: 0.1
+    update_min_d: 0.1
+    # Static maze with an accurate map: weight real hits over random noise so
+    # scans correct the pose sharply (stock 0.5/0.5 gave 0.10-0.17 m lateral
+    # error in the 0.85 m slots, enough for the body to touch wall ends).
+    z_hit: 0.8
     z_max: 0.05
-    z_rand: 0.5
+    z_rand: 0.2
     z_short: 0.05
     scan_topic: scan
 
@@ -91,7 +102,9 @@ controller_server:
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.5
-      movement_time_allowance: 10.0
+      # Turning in place does not count as progress, and a 180 deg turn at
+      # 0.4 rad/s takes ~8-10 s on its own.
+      movement_time_allowance: 20.0
     # Goal checker parameters
     #precise_goal_checker:
     #  plugin: "nav2_controller::SimpleGoalChecker"
@@ -104,50 +117,52 @@ controller_server:
       xy_goal_tolerance: 0.25
       yaw_goal_tolerance: 0.25
     FollowPath:
-      # DWB rather than MPPI: MPPI could not hold the 20 Hz control rate on this
-      # machine alongside Gazebo (measured ~5.5 Hz) and commanded only ~0.06 m/s,
-      # which tripped the progress checker. DWB is cheap and predictable here.
-      plugin: "dwb_core::DWBLocalPlanner"
-      debug_trajectory_details: True
-      # Limits come from unitree_go2_sim/config/gait/gait.yaml. Treated as a
-      # differential drive (no strafing) to keep the gait stable.
-      min_vel_x: 0.0
-      min_vel_y: 0.0
-      max_vel_x: 0.26
-      max_vel_y: 0.0
-      max_vel_theta: 0.45
-      min_speed_xy: 0.0
-      max_speed_xy: 0.26
-      min_speed_theta: 0.0
-      acc_lim_x: 0.5
-      acc_lim_y: 0.0
-      acc_lim_theta: 1.0
-      decel_lim_x: -0.7
-      decel_lim_y: 0.0
-      decel_lim_theta: -1.4
-      vx_samples: 20
-      vy_samples: 0
-      vtheta_samples: 20
-      sim_time: 2.0
-      linear_granularity: 0.05
-      angular_granularity: 0.025
+      # Regulated Pure Pursuit. MPPI could not hold the control rate on this
+      # machine (~5.5 Hz, ~0.06 m/s commanded). DWB was cheap but in the maze it
+      # dithered at near-zero speed for minutes in open space with an accurate
+      # pose and a clear path, tripping the progress checker. RPP follows the
+      # global path directly, turns in place when the heading is off, and is as
+      # cheap as DWB. Differential drive (no strafing, no reversing) to keep the
+      # gait stable; speed limits come from unitree_go2_sim/config/gait/gait.yaml.
+      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      desired_linear_vel: 0.25
+      # Short lookahead: the maze route turns through ~0.9 m slots at wall ends,
+      # and a 0.6 m lookahead cut the inside corner by ~0.17 m, into the wall end.
+      lookahead_dist: 0.4
+      min_lookahead_dist: 0.3
+      max_lookahead_dist: 0.6
+      lookahead_time: 1.5
+      use_velocity_scaled_lookahead_dist: false
+      rotate_to_heading_angular_vel: 0.4
+      use_rotate_to_heading: true
+      rotate_to_heading_min_angle: 0.5
+      # Nav2 default. RPP clamps relative to the measured yaw rate, which sways
+      # with the gait; at 1.0 the command just followed that noise, flipping sign,
+      # and the robot never turned. velocity_smoother still limits acceleration.
+      max_angular_accel: 3.2
+      allow_reversing: false
       transform_tolerance: 0.3
-      xy_goal_tolerance: 0.25
-      trans_stopped_velocity: 0.05
-      short_circuit_trajectory_evaluation: True
-      stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign",
-                "PathAlign", "PathDist", "GoalDist"]
-      BaseObstacle.scale: 0.02
-      PathAlign.scale: 32.0
-      PathAlign.forward_point_distance: 0.1
-      GoalAlign.scale: 24.0
-      GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 32.0
-      GoalDist.scale: 24.0
-      RotateToGoal.scale: 32.0
-      RotateToGoal.slowing_factor: 5.0
-      RotateToGoal.lookahead_time: -1.0
+      # The CHAMP gait mostly steps in place below ~0.1 m/s (0.05 m/s moved the
+      # body 1-7 cm in 2 s), so a slower approach never closed the last few cm
+      # to the goal and the progress checker looped.
+      min_approach_linear_velocity: 0.12
+      approach_velocity_scaling_dist: 0.3
+      use_collision_detection: true
+      max_allowed_time_to_collision_up_to_carrot: 1.0
+      use_regulated_linear_velocity_scaling: true
+      # Slow down on any curve tighter than 1.5 m. At 0.25 m/s the maze's
+      # hairpins need ~0.4 rad/s, at the gait's turn limit, and the robot cut
+      # 0.2 m inside the path towards the wall end.
+      regulated_linear_scaling_min_radius: 1.5
+      regulated_linear_scaling_min_speed: 0.1
+      use_cost_regulated_linear_velocity_scaling: true
+      cost_scaling_dist: 0.6
+      cost_scaling_gain: 1.0
+      inflation_cost_scaling_factor: 3.0
+      use_fixed_curvature_lookahead: false
+      curvature_lookahead_dist: 0.6
+      max_robot_pose_search_dist: 10.0
+      interpolate_curvature_after_goal: false
 
 local_costmap:
   local_costmap:
@@ -160,8 +175,13 @@ local_costmap:
       width: 6
       height: 6
       resolution: 0.05
-      robot_radius: 0.35
-      plugins: ["obstacle_layer", "inflation_layer"]
+      # Rectangle around the Go2's 0.70 x 0.31 m body plus ~2 cm. A 0.35 m
+      # circle doubled its width and blocked the maze's narrow slots; a larger
+      # margin made a robot that was close but not touching refuse every move.
+      footprint: "[[0.37, 0.175], [0.37, -0.175], [-0.37, -0.175], [-0.37, 0.175]]"
+      # static_layer gives the controller the maze walls even inside the L1's
+      # 0.8 m blind spot, where /scan cannot see them.
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
@@ -176,6 +196,8 @@ local_costmap:
           clearing: True
           marking: True
           data_type: "LaserScan"
+          # inf_is_valid stays off here: a wall inside the 0.8 m blind spot reads
+          # as "no return", and clearing along those rays would erase it.
           raytrace_max_range: 5.0
           raytrace_min_range: 0.0
           obstacle_max_range: 4.0
@@ -192,31 +214,58 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_footprint
-      robot_radius: 0.35
+      # Real body footprint. A wider "planning" footprint (half-width 0.33) did make
+      # the planner avoid the 0.6 m gap beside a box, but then any time the robot
+      # drifted within 0.33 m of a wall its own start cell counted as a collision
+      # and every replan failed ("no valid path found").
+      footprint: "[[0.37, 0.175], [0.37, -0.175], [-0.37, -0.175], [-0.37, 0.175]]"
       resolution: 0.05
       track_unknown_space: true
+      # obstacle_layer lets the planner see obstacles that are not in the map
+      # (the maze's boxes) and replan around them. It marks scans using the AMCL
+      # pose, so marking is limited to 2.5 m, where readings are most accurate:
+      # with metres of AMCL error it once painted duplicate walls into corridors.
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: True
-        observation_sources: scan
+        observation_sources: scan unmapped
         scan:
           topic: /scan
           max_obstacle_height: 2.0
           clearing: True
           marking: True
           data_type: "LaserScan"
-          raytrace_max_range: 10.0
+          # "No return" clears: stale marks are wiped as soon as the robot looks
+          # through them again.
+          inf_is_valid: true
+          raytrace_max_range: 3.0
           raytrace_min_range: 0.0
-          obstacle_max_range: 8.0
+          obstacle_max_range: 2.5
+          obstacle_min_range: 0.0
+        # Halos from unmapped_obstacle_marker.py around obstacles that are not in
+        # the map. The lidar only marks their visible faces; the halo gives them a
+        # size, so too-narrow gaps beside them read as closed and the planner
+        # detours. The cloud is in the map frame, whose origin the layer treats as
+        # the sensor, hence the large obstacle_max_range.
+        unmapped:
+          topic: /unmapped_obstacles
+          data_type: "PointCloud2"
+          marking: True
+          clearing: False
+          min_obstacle_height: 0.0
+          max_obstacle_height: 2.0
+          obstacle_max_range: 100.0
           obstacle_min_range: 0.0
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0
-        inflation_radius: 0.7
+        # Wide, gentle gradient that spans the 1.6 m corridors, so Smac's
+        # cost_travel_multiplier has a cost field to centre the path on.
+        cost_scaling_factor: 2.0
+        inflation_radius: 1.0
       always_send_full_costmap: True
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -239,10 +288,24 @@ planner_server:
     planner_plugins: ["GridBased"]
     costmap_update_timeout: 1.0
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.5
-      use_astar: false
+      # Smac 2D rather than NavFn: NavFn hugged wall ends (0.37-0.50 m centre
+      # clearance) regardless of inflation, and the 0.70 m long body then clipped
+      # corners. cost_travel_multiplier pushes the path to corridor centres.
+      plugin: "nav2_smac_planner::SmacPlanner2D"
+      tolerance: 0.25
+      downsample_costmap: false
+      downsampling_factor: 1
       allow_unknown: true
+      max_iterations: 1000000
+      max_on_approach_iterations: 1000
+      max_planning_time: 2.0
+      cost_travel_multiplier: 6.0
+      use_final_approach_orientation: false
+      smoother:
+        max_iterations: 1000
+        w_smooth: 0.3
+        w_data: 0.2
+        tolerance: 1.0e-10
 
 smoother_server:
   ros__parameters:
