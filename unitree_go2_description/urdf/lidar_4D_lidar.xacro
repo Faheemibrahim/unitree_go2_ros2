@@ -3,7 +3,9 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
     <xacro:macro name="lidar_l1">
 
-        <!-- Lidar L1-->
+        <!-- Lidar L1. The mesh's origin is a corner of its 75 x 75 mm base, so it is
+             shifted by half that to put the base centre on the link origin, which is
+             where the SDK frame sits. -->
         <link name="lidar_l1_link">
             <inertial>
                 <mass value="0.5"/>
@@ -11,7 +13,7 @@
                 <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
             </inertial>
             <visual>
-                <origin rpy="0 0 0" xyz="0 0 0"/>
+                <origin rpy="0 0 0" xyz="-0.0375 -0.0375 0"/>
                 <geometry>
                     <mesh filename="file://$(find unitree_go2_description)/meshes/L1_4D_Lidar.dae" scale="1 1 1"/>
                 </geometry>
@@ -20,7 +22,7 @@
                 </material>
             </visual>
             <collision>
-                <origin rpy="0 0 0" xyz="0 0 0"/>
+                <origin rpy="0 0 0" xyz="-0.0375 -0.0375 0"/>
                 <geometry>
                     <mesh filename="file://$(find unitree_go2_description)/meshes/L1_4D_Lidar.dae" scale="1 1 1"/>
                 </geometry>
