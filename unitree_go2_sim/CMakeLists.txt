@@ -24,4 +24,9 @@ install(
   DIRECTORY rviz 
   DESTINATION share/${PROJECT_NAME}
 )
+install(
+  PROGRAMS scripts/l1_scan_pattern.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ament_package()

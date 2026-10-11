@@ -29,7 +29,7 @@ Visualization Manager:
       Enabled: false
       Show Names: true
       Marker Scale: 0.3
-    # The raw L1 cloud, coloured by height: what the sensor sees.
+    # One L1 message, coloured by height: what the sensor publishes (~1,400 points).
     - Class: rviz_default_plugins/PointCloud2
       Name: L1 raw cloud
       Enabled: false
@@ -47,10 +47,10 @@ Visualization Manager:
       Use Fixed Frame: true
       Autocompute Value Bounds: true
       Decay Time: 0
-    # The cloud after the body crop box (step 2).
+    # One message after the body crop box.
     - Class: rviz_default_plugins/PointCloud2
       Name: L1 cropped cloud
-      Enabled: true
+      Enabled: false
       Topic:
         Value: /unitree_lidar/points_cropped
         Reliability Policy: Best Effort
@@ -63,6 +63,24 @@ Visualization Manager:
       Color Transformer: FlatColor
       Color: 0; 200; 255
       Use Fixed Frame: true
+      Decay Time: 0
+    # The last 0.3 s of cropped messages merged: what the 2D scan is built from.
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 merged 0.3 s
+      Enabled: true
+      Topic:
+        Value: /unitree_lidar/points_accumulated
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Style: Flat Squares
+      Size (m): 0.015
+      Alpha: 1
+      Color Transformer: AxisColor
+      Axis: Z
+      Use Fixed Frame: true
+      Autocompute Value Bounds: true
       Decay Time: 0
     # The 2D scan that AMCL, slam_toolbox and the costmaps use.
     - Class: rviz_default_plugins/LaserScan

@@ -10,10 +10,13 @@
 # the hind legs are outside the field of view. Margins of ~5-7 cm, and the box stops
 # short of the footprint's front edge (0.37) so a wall the nose nearly touches stays
 # visible. Re-check against a real bag: the real robot stands taller.
+# The input is in odom; each cloud is cropped in base_link at its own stamp, then put
+# back in odom for merging.
 body_crop:
   ros__parameters:
     use_sim_time: true
     input_frame: base_link
+    output_frame: odom
     negative: true            # drop the points inside the box, keep the rest
     min_x: -0.45
     max_x: 0.33
@@ -22,6 +25,16 @@ body_crop:
     min_z: -0.40
     max_z: 0.20
     keep_organized: false
+
+# One L1 message (~1,400 points, 12 sweeps) leaves 4-22 deg gaps in azimuth; ~0.3 s
+# (about 5 messages, 60 sweeps) fills them to a few degrees. Go2 users buffer the same
+# (docs/L1_LIDAR_REALISM.md sections 4.3 and 7). Longer smears moving obstacles.
+cloud_accumulator:
+  ros__parameters:
+    # Works from message stamps only; subscribing to the sim clock (~1 kHz) cost
+    # half a core in rclpy for nothing.
+    use_sim_time: false
+    window_s: 0.3
 
 pointcloud_to_laserscan:
   ros__parameters:
@@ -40,11 +53,11 @@ pointcloud_to_laserscan:
     min_height: 0.08
     max_height: 0.18
 
-    # 1 deg bins, the dense render's azimuth step.
+    # 1 deg bins. One scan per lidar message (~15 Hz), each from the last 0.3 s.
     angle_min: -3.14159
     angle_max: 3.14159
     angle_increment: 0.01745
-    scan_time: 0.05
+    scan_time: 0.0667
 
     # Distances are horizontal, from base_footprint. The crop box already removed the
     # body. The cap exists because floor returns drift into the band as a tilt error

@@ -53,7 +53,9 @@
 
         <gazebo reference="lidar_l1_optical">
             <sensor name="lidar_l1" type="gpu_lidar">
-                <topic>unitree_lidar</topic>
+                <!-- The dense render, which l1_scan_pattern.py thins to the real L1's
+                     pattern and publishes as /unitree_lidar/points. -->
+                <topic>l1_dense</topic>
                 <!-- The Go2 publishes /utlidar/cloud at about 15 Hz, but Gazebo
                      delivered only ~10 Hz when asked for 15, and exactly 20 Hz when
                      asked for 20 (measured in sim time). Rendering at 20 and thinning

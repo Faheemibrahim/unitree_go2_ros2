@@ -125,7 +125,7 @@ up in about 10 s (`rviz:=false` to leave RViz out). If RViz does not open, a sta
 same world. Check it is ready:
 
 ```bash
-ros2 topic hz /scan                      # about 20 Hz
+ros2 topic hz /scan                      # about 15 Hz
 ros2 lifecycle get /bt_navigator         # should be: active
 ```
 
@@ -187,7 +187,7 @@ To map something new, save into the same directory with a new name, for example
 ## Quick checks if something looks wrong
 
 ```bash
-ros2 topic hz /scan                                         # about 20 Hz
+ros2 topic hz /scan                                         # about 15 Hz
 ros2 lifecycle get /slam_toolbox                            # Part 1: active
 ros2 lifecycle get /bt_navigator                            # Part 2: active
 ros2 topic echo /foot_contacts --once                       # some entries true while walking

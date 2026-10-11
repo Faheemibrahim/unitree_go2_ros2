@@ -292,15 +292,21 @@ The `unitree_go2_navigation` package flattens the L1 4D lidar cloud into a
 
 Start the simulator first, then **one** of the other two (each owns `map -> odom`).
 
-The simulated L1 matches the real one's mount and field of view
-([docs/L1_LIDAR_REALISM.md](docs/L1_LIDAR_REALISM.md)): under the chin, it
-sees only the half-sphere below its mounting face, tilted 15 deg forward. So
-walls appear in a 2D scan only in a thin band around the lidar's own height,
-and nothing behind the robot does. The scan conversion crops the robot's legs
-out of the cloud (`pcl_ros` crop box in `base_link`), then flattens a band
-from 10 cm above the floor to 5 cm above the lidar, out to 10 m, in
-`base_footprint` (`config/pointcloud_to_laserscan.yaml`). Both are stock C++
-nodes, so the same pipeline can run on the robot.
+The simulated L1 matches the real one's mount, field of view, scan pattern
+and timing ([docs/L1_LIDAR_REALISM.md](docs/L1_LIDAR_REALISM.md)): under the
+chin, it sees only the half-sphere below its mounting face, tilted 15 deg
+forward. Gazebo renders that half-sphere densely and `l1_scan_pattern.py`
+keeps only the samples the real sensor takes: about 1,400 points per message
+on 12 mirror sweeps at about 15 Hz, with the L1's fields (x y z intensity
+ring time), delivered late as from the robot's own computer, plus a copy in
+`odom` like the Go2's `/utlidar/cloud_deskewed`. One message is sparse, so the
+scan conversion crops the robot's legs out of each message (`pcl_ros` crop
+box in `base_link`), merges the last 0.3 s, then flattens a band from 10 cm
+above the floor to 5 cm above the lidar, out to 10 m, in `base_footprint`
+(`config/pointcloud_to_laserscan.yaml`). Walls show up in the scan only in a
+thin band around the lidar's height, and nothing behind the robot does. The
+crop and the projection are stock C++ nodes and the merge only joins bytes, so
+the same pipeline can run on the robot.
 
 ### TF ownership
 

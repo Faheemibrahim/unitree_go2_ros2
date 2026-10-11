@@ -292,7 +292,25 @@ def generate_launch_description():
         executable='parameter_bridge',
         name='lidar_l1_bridge',
         output='screen',
-        arguments=[ '/unitree_lidar/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked', ],
+        arguments=[ '/l1_dense/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked', ],
+        condition=UnlessCondition(LaunchConfiguration('disable_lidar_l1')),
+    )
+
+    # Thins the dense render to the real L1's scan pattern, density and timing, and
+    # publishes /unitree_lidar/points (sensor frame) and /unitree_lidar/points_deskewed
+    # (odom), like the Go2's /utlidar/cloud and /utlidar/cloud_deskewed.
+    l1_scan_pattern = Node(
+        package='unitree_go2_sim',
+        executable='l1_scan_pattern.py',
+        name='l1_scan_pattern',
+        output='screen',
+        # Timed by the renders' stamps; a sim-clock subscription only costs CPU.
+        parameters=[{'use_sim_time': False}],
+        remappings=[
+            ('dense', '/l1_dense/points'),
+            ('~/cloud', '/unitree_lidar/points'),
+            ('~/cloud_deskewed', '/unitree_lidar/points_deskewed'),
+        ],
         condition=UnlessCondition(LaunchConfiguration('disable_lidar_l1')),
     )
 
@@ -378,6 +396,7 @@ def generate_launch_description():
             camera_bridge,
             d455_bridge,
             lidar_l1_bridge,
+            l1_scan_pattern,
             velodyne_bridge,
             
             # CHAMP controller nodes

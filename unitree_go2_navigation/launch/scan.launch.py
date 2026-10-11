@@ -1,16 +1,20 @@
-"""Lidar cloud to 2D /scan: crop the robot's own legs out of the L1 cloud, then flatten
-a height band around the lidar into a LaserScan.
+"""Lidar cloud to 2D /scan: crop the robot's own legs out of each L1 cloud, merge the
+last 0.3 s of clouds, then flatten a height band around the lidar into a LaserScan.
 
-  /unitree_lidar/points -> body_crop -> /unitree_lidar/points_cropped
-                        -> pointcloud_to_laserscan -> /scan
+  /unitree_lidar/points_deskewed (odom) -> body_crop -> /unitree_lidar/points_cropped
+    -> cloud_accumulator -> /unitree_lidar/points_accumulated
+    -> pointcloud_to_laserscan -> /scan
+
+The input is the cloud in odom, as the Go2's /utlidar/cloud_deskewed is: one message is
+too sparse to project on its own, and merging needs a fixed frame.
 
 nav2.launch.py and slam.launch.py include this. On its own it shows what the 2D scan
 looks like (open unitree_go2_sim/rviz/lidar_check.rviz):
   ros2 launch unitree_go2_navigation scan.launch.py
 
-Both nodes are stock C++ packages (pcl_ros, pointcloud_to_laserscan), so the same
-pipeline can run on the robot's Jetson. Values and their reasons are in
-config/pointcloud_to_laserscan.yaml.
+The crop and the projection are stock C++ packages (pcl_ros, pointcloud_to_laserscan);
+the accumulator only joins message bytes. So the same pipeline can run on the robot's
+Jetson. Values and their reasons are in config/pointcloud_to_laserscan.yaml.
 """
 
 import os
@@ -35,8 +39,20 @@ def generate_launch_description():
         output="screen",
         parameters=[config],
         remappings=[
-            ("input", "/unitree_lidar/points"),
+            ("input", "/unitree_lidar/points_deskewed"),
             ("output", "/unitree_lidar/points_cropped"),
+        ],
+    )
+
+    cloud_accumulator_node = Node(
+        package="unitree_go2_navigation",
+        executable="cloud_accumulator.py",
+        name="cloud_accumulator",
+        output="screen",
+        parameters=[config],
+        remappings=[
+            ("input", "/unitree_lidar/points_cropped"),
+            ("output", "/unitree_lidar/points_accumulated"),
         ],
     )
 
@@ -47,9 +63,9 @@ def generate_launch_description():
         output="screen",
         parameters=[config],
         remappings=[
-            ("cloud_in", "/unitree_lidar/points_cropped"),
+            ("cloud_in", "/unitree_lidar/points_accumulated"),
             ("scan", "/scan"),
         ],
     )
 
-    return LaunchDescription([body_crop_node, pointcloud_to_laserscan_node])
+    return LaunchDescription([body_crop_node, cloud_accumulator_node, pointcloud_to_laserscan_node])

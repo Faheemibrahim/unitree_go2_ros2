@@ -28,7 +28,7 @@ install(
 )
 
 install(
-  PROGRAMS scripts/unmapped_obstacle_marker.py
+  PROGRAMS scripts/unmapped_obstacle_marker.py scripts/cloud_accumulator.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
