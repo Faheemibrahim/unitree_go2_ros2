@@ -20,26 +20,33 @@ This package provides a complete ROS 2 Jazzy integration for the Unitree Go2 qua
 
 ## Quick start: navigation demo
 
-From a fresh container (`~/go2_docker/run.sh`), inside the container:
+From a fresh container (`~/go2_docker/run.sh`), inside the container, build once:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd ~/ws
 colcon build && source install/setup.bash
-ros2 launch unitree_go2_navigation demo_nav.launch.py
 ```
 
-That one command starts Gazebo, AMCL on the saved map of the default
-world, and Nav2. RViz is **not** started by it — see
-[Known limitations](#known-limitations) — start it by hand once the stack is
-up:
+Then start the pieces separately, each in its own terminal (open more with
+`~/go2_docker/run.sh shell` and source `~/ws/install/setup.bash` in each):
 
 ```bash
-rviz2 -d ~/ws/install/unitree_go2_navigation/share/unitree_go2_navigation/rviz/nav2_go2.rviz \
-  --ros-args -p use_sim_time:=true
+# 1. the simulator (Gazebo only; maze world by default). Wait about 90 s.
+ros2 launch unitree_go2_sim unitree_go2_launch.py
+
+# 2a. navigation on the saved map (AMCL + Nav2), opens RViz with the Nav2 view
+ros2 launch unitree_go2_navigation nav2.launch.py
+
+# 2b. OR mapping (slam_toolbox), opens RViz with a mapping view; drive with teleop
+ros2 launch unitree_go2_navigation slam.launch.py
 ```
 
-**Wait 90-120 seconds before doing anything.** Gazebo has to spawn the
+Run either 2a or 2b, never both: each owns the `map -> odom` transform. Full
+paste-ready commands, saving a map, and where the map and world are set:
+[docs/COMMANDS.md](docs/COMMANDS.md).
+
+**Wait about 90 seconds after starting the simulator.** Gazebo has to spawn the
 robot and the controllers have to come up; errors printed during that
 window are normal. The stack is ready when `/clock` is advancing,
 `/joint_states`, `/odom` and `/scan` are publishing, and
@@ -53,33 +60,27 @@ ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
    orientation: {w: 1.0}}}}"
 ```
 
-Goal points worth trying in the default world (obstacles sit at
-`(5,0)`, `(-3,4)`, `(0,-5)`, `(3,3)` and `(-4,-3)`):
+Goal points worth trying in the maze (map frame; the robot spawns at the origin):
 
 | Goal | What it shows |
 |---|---|
-| `(2.0, 2.0)` | Plain traverse across open floor |
-| `(-2.5, -2.0)` | Longer route between two obstacles |
-| `(6.5, 0.0)` | Forces a detour around the box at `(5,0)` |
+| `(-2.4, 0.0)` | A short, safe first goal: 2.4 m straight across the central clearing |
+| `(-4.24, 1.8)` | About 6 m, round a turn |
+| `(-10.49, 9.37)` | The far north-west corner, about 84 m and 11 minutes. Driven successfully three times in simulation |
 
-A successful run: the robot walks a smooth path, the global plan is
-redrawn when something blocks it, the action returns `SUCCEEDED`, and the
-robot ends up near the goal. Expect it to stop **0.3-2.1 m** from the
-requested point - see [Known limitations](#known-limitations).
+A successful run: the robot walks a smooth path, the action returns
+`SUCCEEDED`, and the robot ends up near the goal. In the maze runs it stopped
+about **0.3-0.4 m** from the requested point; it is slow and the 0.85 m gaps at
+wall ends leave only a few centimetres of margin. See
+[Known limitations](#known-limitations). All of this is simulation only.
 
-To map a new world instead of localizing on the saved one:
-
-```bash
-ros2 launch unitree_go2_navigation demo_nav.launch.py mode:=slam
-ros2 run nav2_map_server map_saver_cli -f ~/ws/my_map   # when done
-```
-
-Useful arguments: `mode:=slam|localization`, `map:=/path/to/map.yaml`,
-`world:=/path/to/world.sdf`, `gui:=false`, `rviz:=true` (not recommended),
-`odom_source:=ekf|lio` (only `ekf` is implemented).
+Useful arguments: simulator `world:=/path/to/world.sdf`, `gui:=false`, `rviz:=true`;
+`nav2.launch.py` `map:=/path/to/map.yaml`, `rviz:=false`, `nav2_delay:=<s>`;
+`slam.launch.py` `rviz:=false`. A single maps directory,
+`unitree_go2_navigation/maps/`, holds the saved map; save new maps there and rebuild.
 
 For the maze world (`maze.sdf`, map `maze_world2`), including manual mapping with teleop and
-paste-ready navigation commands, see [docs/COMMANDS.md](docs/COMMANDS.md).
+paste-ready commands, see [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## About Unitree Go2
 
@@ -284,9 +285,11 @@ The `unitree_go2_navigation` package flattens the L1 4D lidar cloud into a
 
 | Launch file | What it does |
 |---|---|
-| `slam.launch.py` | Sim + scan conversion + slam_toolbox. Mapping only, no Nav2 |
-| `nav2.launch.py` | Adds Nav2. `mode:=slam` or `mode:=localization` |
-| `demo_nav.launch.py` | `nav2.launch.py` plus a Nav2 RViz view. Use this for demos |
+| `unitree_go2_sim/launch/unitree_go2_launch.py` | The simulator alone: Gazebo, the robot and its controllers. Maze world by default |
+| `unitree_go2_navigation/launch/slam.launch.py` | Scan conversion + slam_toolbox, with RViz (mapping view). Drive with teleop |
+| `unitree_go2_navigation/launch/nav2.launch.py` | Scan conversion + AMCL on the saved map + Nav2 + the unmapped-obstacle node, with RViz (Nav2 view) |
+
+Start the simulator first, then **one** of the other two (each owns `map -> odom`).
 
 The lidar is mounted tilted, so the cloud is transformed into
 `base_footprint` before a height band is applied; filtering in the sensor
@@ -330,30 +333,35 @@ over.
 
 ## Known limitations
 
-**Localization accuracy is poor in the default world.** The world contains
-only five small obstacles, so AMCL has very little to match against and
-the robot typically stops **0.3-1.5 m** from the requested goal, with the
-larger errors (up to 2.1 m seen) when it travels through unmapped space. Nav2 reports
-`SUCCEEDED` because it believes it arrived. A world with walls would fix
-this; the navigation stack itself is not at fault.
+**Localization is good enough to drive the maze, with thin margins.** In the
+maze world AMCL's true error was a mean of about 0.1-0.15 m, with occasional
+spikes of 0.5-0.8 m. That came from fixing the leg-odometry scale
+(`odom_scaler` in `unitree_go2_sim/config/gait/gait.yaml`: CHAMP under-reported
+distance by about 30%) and from walls giving AMCL something to match. The
+maze's 0.85 m gaps at wall ends leave the body only a few centimetres of
+margin. Measured in simulation only, not on the real robot. The older default
+world (`worlds/default.sdf`, five small obstacles, no saved map any more) gave
+0.3-2.1 m of goal error.
 
-**The lidar cannot see anything closer than 0.8 m.** That is the sensor's
-own minimum range, and the robot is about 0.7 m long, so obstacles right
+**The simulated lidar cannot see anything closer than 0.8 m.** That is the
+simulated sensor's minimum range (Unitree's specification for the real L1 is
+0.05 m, so this is a gap in the simulation), and the robot is about 0.7 m long, so obstacles right
 against the robot are invisible. Costmap inflation is set to 0.70 m to
 compensate, but do not expect reliable avoidance of something that walks
 into the robot.
 
-**Starting RViz from the launch file breaks the stack.** DDS discovery
+**Starting RViz together with the simulator can break the stack.** DDS discovery
 saturates, `/clock` stops being delivered to ROS even though Gazebo keeps
-running, and Nav2 never activates. Delaying RViz by 45 s made this
-intermittent rather than fixing it, so `demo_nav.launch.py` now defaults
-to `rviz:=false`. Start RViz by hand once the stack is up, which was
-reliable in testing. If `/clock` is already lost, closing RViz does not
-recover it - restart the stack.
+running, and Nav2 never activates. That was seen when RViz started in the
+same launch as the simulator. The simulator launch now defaults to
+`rviz:=false`, and `nav2.launch.py` / `slam.launch.py` open RViz seconds after
+their own nodes, with the simulator already settled; that was reliable in
+testing. If `/clock` is lost, closing RViz does not recover it - restart the stack.
 
 **MPPI is too slow here.** It could not hold its 20 Hz control rate
 alongside Gazebo (measured ~5.5 Hz) and commanded only ~0.06 m/s, which
-tripped Nav2's progress checker. The controller is DWB instead.
+tripped Nav2's progress checker. DWB replaced it, and DWB in turn dithered at
+near-zero speed in the maze, so the controller is now Regulated Pure Pursuit.
 
 **Lidar timing.** The lidar publishes 10 frames per *simulated* second as
 configured. Its wall-clock rate looks lower (~8.3-9.3 Hz) only because the

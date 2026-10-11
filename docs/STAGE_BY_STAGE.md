@@ -1,5 +1,18 @@
 # Understanding the stack, one stage at a time
 
+> **Status note.** This walkthrough was written against the original `default.sdf`
+> world (five small obstacles) and a map of it called `default_world`. That map is
+> no longer in the repository: the single maps directory,
+> `unitree_go2_navigation/maps/`, now holds `maze_world2`, built by driving the
+> robot with teleop in `maze.sdf`, and the navigation launch files default to that
+> pair. Where this document says `default_world`, read it as "the map you build
+> in these steps". Later changes (the odometry calibration, Regulated Pure
+> Pursuit, Smac 2D, the unmapped-obstacle node) are in
+> [COMMANDS.md](COMMANDS.md) and the commit messages, not here. The bundled
+> `demo_nav.launch.py` and the sim-plus-SLAM `slam.launch.py` it describes no
+> longer exist: there are now three launch files (simulator, `slam.launch.py`,
+> `nav2.launch.py`), each started separately.
+
 **Read this first.** It explains the robot code as it came, and then each
 layer we added on top of it, in the order the layers depend on each other.
 For every file it says whether it was **written from scratch**, **copied

@@ -4,6 +4,16 @@
 > [STAGE_BY_STAGE.md](STAGE_BY_STAGE.md) first.** It explains the robot as it
 > came, then each layer added on top, and where every file came from.
 
+> **Status note.** The commands below build a map called `default_world` in the
+> original `default.sdf` world. The repository no longer ships that map: its
+> single maps directory, `unitree_go2_navigation/maps/`, holds `maze_world2`
+> (built in `maze.sdf`), and the navigation launch files default to that pair.
+> The code excerpts in this guide are snapshots at the commit being described,
+> so they still show the old defaults and the bundled `demo_nav.launch.py`, which
+> no longer exists: there are now three launch files (simulator, `slam.launch.py`,
+> `nav2.launch.py`), each started separately. For the current commands see
+> [COMMANDS.md](COMMANDS.md).
+
 This guide rebuilds the navigation work in this repository from nothing, in the
 order it was actually built. It is written for someone who has **never used
 ROS**. Every term is defined in the [Glossary](#7-glossary), every command can
@@ -2273,8 +2283,8 @@ unitree_go2_ros2/
     │                                RViz view, with RViz on a timer
     │
     ├── maps/
-    │   ├── default_world.pgm        Saved map picture of the default world
-    │   └── default_world.yaml       Its scale, origin and thresholds
+    │   ├── maze_world2.pgm          Saved map picture of the maze world
+    │   └── maze_world2.yaml         Its scale, origin and thresholds
     │
     └── rviz/
         └── nav2_go2.rviz            RViz layout for navigation, copied unchanged

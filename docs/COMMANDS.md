@@ -3,10 +3,22 @@
 Paste-ready commands. Everything runs inside the `go2_jazzy` container unless marked
 **host**. The workspace is `~/go2_jazzy_ws` on the host and `~/ws` in the container.
 
-- Part 1 builds a map by driving the robot yourself.
-- Part 2 navigates on a saved map (maze_world2) with Nav2.
+There are three launch files, each started in its own terminal:
 
-Do not run Part 1 and Part 2 at the same time. Part 2 starts its own sim.
+| What | Command | Opens |
+|---|---|---|
+| Simulator | `ros2 launch unitree_go2_sim unitree_go2_launch.py` | Gazebo only (maze world) |
+| Mapping | `ros2 launch unitree_go2_navigation slam.launch.py` | slam_toolbox + RViz mapping view |
+| Navigation | `ros2 launch unitree_go2_navigation nav2.launch.py` | AMCL + Nav2 + RViz Nav2 view |
+
+Always start the simulator first and let it settle (about 90 s). Run **either** SLAM **or**
+Nav2, never both: each one owns the `map -> odom` transform.
+
+- Part 1 builds a map by driving the robot yourself.
+- Part 2 navigates on a saved map (`maze_world2`).
+
+Start both parts from a **fresh** simulator if you want the map frame to line up with
+Gazebo's world: SLAM's map origin is wherever the robot's odometry is when it starts.
 
 ## 0. Setup
 
@@ -46,24 +58,24 @@ Maps and worlds are copied into `install/` at build time, so a new map such as
 
 ## Part 1: Mapping (manual drive)
 
-### Terminal A: sim + RViz with the maze world
+### Terminal A: the simulator
 
 ```bash
-ros2 launch unitree_go2_sim unitree_go2_launch.py \
-  world:=$(ros2 pkg prefix unitree_go2_description)/share/unitree_go2_description/worlds/maze.sdf \
-  disable_static_map_odom:=true
+ros2 launch unitree_go2_sim unitree_go2_launch.py
 ```
 
-Wait 90-120 s, until the log shows `joint_group_effort_controller` configured and activated.
-`disable_static_map_odom:=true` is needed because slam_toolbox publishes `map -> odom`.
+Defaults: the maze world, Gazebo window on, no RViz, and no static `map -> odom` (slam_toolbox
+or AMCL owns it). Wait about 90 s, until the log shows `joint_group_effort_controller`
+configured and activated. Other worlds: `world:=/path/to/world.sdf`. No window: `gui:=false`.
 
-### Terminal B: SLAM (after the sim has settled)
+### Terminal B: SLAM (after the simulator has settled)
 
 ```bash
-ros2 launch unitree_go2_navigation slam_only.launch.py
+ros2 launch unitree_go2_navigation slam.launch.py
 ```
 
-Restart only this terminal after changing `slam_toolbox.yaml`.
+This also opens RViz with the mapping view. Add `rviz:=false` to leave it out. Restart only this
+terminal after changing `slam_toolbox.yaml`.
 
 ### Terminal C: drive
 
@@ -90,34 +102,33 @@ Stop Part 1 with Ctrl+C in every terminal before starting Part 2.
 
 ## Part 2: Navigation on a saved map
 
-### Terminal A: sim + Nav2 + AMCL on maze_world2
+### Terminal A: the simulator
+
+Same as Part 1, Terminal A:
 
 ```bash
-ros2 launch unitree_go2_navigation demo_nav.launch.py \
-  mode:=localization \
-  world:=$(ros2 pkg prefix unitree_go2_description)/share/unitree_go2_description/worlds/maze.sdf \
-  map:=$(ros2 pkg prefix unitree_go2_navigation)/share/unitree_go2_navigation/maps/maze_world2.yaml
+ros2 launch unitree_go2_sim unitree_go2_launch.py
 ```
 
-Wait 90-120 s (Nav2 itself starts at 40 s). Then check it is ready:
+Wait about 90 s for the controllers.
+
+### Terminal B: Nav2 + AMCL on maze_world2, with RViz
+
+```bash
+ros2 launch unitree_go2_navigation nav2.launch.py
+```
+
+Nav2 is ready in about 10-15 s. RViz opens by itself with the Nav2 view about 25 s after the
+launch, once Nav2 is up (`rviz:=false` to leave it out, `rviz_delay:=` to change the wait). The map defaults to `maze_world2.yaml`; use `map:=/path/to/other.yaml` for another map of the
+same world. Check it is ready:
 
 ```bash
 ros2 topic hz /scan                      # about 8-10 Hz
 ros2 lifecycle get /bt_navigator         # should be: active
 ```
 
-If the nodes stay `unconfigured`, Nav2 bringup stalled (known DDS issue). Ctrl+C and relaunch.
-
-### Terminal B: Nav2 RViz (start it by hand once Terminal A is up)
-
-```bash
-ros2 run rviz2 rviz2 \
-  -d $(ros2 pkg prefix unitree_go2_navigation)/share/unitree_go2_navigation/rviz/nav2_go2.rviz \
-  --ros-args -p use_sim_time:=true
-```
-
-RViz is not started by the launch file on purpose: starting it from there saturated DDS
-discovery on this machine.
+If the nodes stay `unconfigured`, Nav2 bringup stalled (a lifecycle reply was dropped under
+CPU load). Ctrl+C and relaunch, or raise `nav2_delay:=10.0`.
 
 ### Move the robot
 
@@ -144,28 +155,30 @@ about 11 minutes): `x: -10.49, y: 9.37`. Start with something short before tryin
 ### Obstacles that are not in the map
 
 The four 0.5 m boxes in `maze.sdf` are deliberately not in `maze_world2`. The robot has to
-detect them. `unmapped_obstacle_marker.py` (started by `nav2.launch.py` in localization mode)
+detect them. `unmapped_obstacle_marker.py` (started by `nav2.launch.py`)
 publishes a halo around scan hits that are far from every mapped wall to `/unmapped_obstacles`,
 which the global costmap marks, so the planner treats a too-narrow gap beside a box as closed.
 Check it with `ros2 topic echo /unmapped_obstacles --once`: it should be empty with only walls
 in view. This detour behaviour was checked in isolation but a full recorded drive past a box
 has not been completed yet.
 
-### Where to change the map path
+### Where the map and world are set
 
-The map is the `map` launch argument. Two ways to set it:
+There is one maps directory, `unitree_go2_navigation/maps/`. It holds `maze_world2.{pgm,yaml}`.
+The map is the `map` argument of `nav2.launch.py`, and the world is the `world` argument of the simulator:
 
-- **Per run (used above):** pass `map:=/path/to/file.yaml` on the command line.
-- **Permanently:** change the default in the launch file.
-  - [nav2.launch.py](../unitree_go2_navigation/launch/nav2.launch.py), line 37:
-    `default_map = os.path.join(unitree_go2_navigation, "maps", "default_world.yaml")`
-  - [demo_nav.launch.py](../unitree_go2_navigation/launch/demo_nav.launch.py), line 25: same line.
-  - Change `default_world.yaml` to `maze_world2.yaml` in **both**. `demo_nav` passes its own
-    default into `nav2.launch.py`, so changing only one has no effect when you launch `demo_nav`.
+- **Per run:** pass `map:=/path/to/file.yaml` to Nav2 and/or `world:=/path/to/world.sdf` to the simulator.
+- **Map default:** `default_map` near the top of
+  [nav2.launch.py](../unitree_go2_navigation/launch/nav2.launch.py).
+- **World default:** `default_world_path` near the top of
+  [unitree_go2_launch.py](../unitree_go2_sim/launch/unitree_go2_launch.py), or `world:=` on the
+  simulator command.
+- **Keep the map and world as a pair.** A map made in one world will not localize in another.
 
-The world works the same way: `default_world` on line 38 of `nav2.launch.py` and line 26 of
-`demo_nav.launch.py` (change `default.sdf` to `maze.sdf`). Rebuild `unitree_go2_navigation`
-after any edit.
+After editing a launch file, or adding a map, rebuild `unitree_go2_navigation` so it is installed.
+
+To map something new, save into the same directory with a new name, for example
+`maze_world3`, then pass `map:=` (see Part 1, Terminal D).
 
 ---
 
@@ -184,7 +197,8 @@ ros2 topic echo /odom --once --field pose.pose.position     # changes as the rob
 - RViz sees no topics: clear `/dev/shm` (Setup), then relaunch.
 - Robot missing in the mapping RViz before SLAM starts: Fixed Frame must be `odom`
   (`unitree_go2_sim/rviz/rviz.rviz`).
-- Map not found at launch: rebuild `unitree_go2_navigation` so the map is installed.
+- Map not found at launch: rebuild `unitree_go2_navigation` so the map is installed, and check the
+  file is in `unitree_go2_navigation/maps/` (there is only that one maps directory).
 - Robot localizes badly or goals land off target: check `odom_scaler` in
   `unitree_go2_sim/config/gait/gait.yaml` first. Leg odometry that under-reports distance made
   AMCL fall behind, which looked like a planning problem. AMCL's laser range is already set to
