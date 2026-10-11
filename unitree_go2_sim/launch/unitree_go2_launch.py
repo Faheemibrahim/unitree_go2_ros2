@@ -31,7 +31,9 @@ def generate_launch_description():
     gait_config = os.path.join(unitree_go2_sim, "config/gait/gait.yaml")
     links_config = os.path.join(unitree_go2_sim, "config/links/links.yaml")
     default_model_path = os.path.join(unitree_go2_description, "urdf/unitree_go2_robot.xacro")
-    default_world_path = os.path.join(unitree_go2_description, "worlds/default.sdf")
+    # The maze is the world the navigation package's saved map belongs to. The original
+    # worlds/default.sdf is still available with world:=<path>.
+    default_world_path = os.path.join(unitree_go2_description, "worlds/maze.sdf")
 
     declare_use_sim_time = DeclareLaunchArgument(
         "use_sim_time",
@@ -39,7 +41,8 @@ def generate_launch_description():
         description="Use simulation (Gazebo) clock if true",
     )
     declare_rviz = DeclareLaunchArgument(
-        "rviz", default_value="true", description="Launch rviz"
+        "rviz", default_value="false",
+        description="Launch the sim's own RViz (the SLAM and Nav2 launches open theirs)"
     )
     declare_robot_name = DeclareLaunchArgument(
         "robot_name", default_value="go2", description="Robot name"
@@ -89,8 +92,8 @@ def generate_launch_description():
     )
     declare_disable_static_map_odom = DeclareLaunchArgument(
         "disable_static_map_odom",
-        default_value="false",
-        description="Leave out the static map->odom transform, for when SLAM publishes it",
+        default_value="true",
+        description="Leave out the static map->odom transform. On by default: slam_toolbox or AMCL always owns it, and two publishers conflict",
     )
 
     # Description nodes and parameters

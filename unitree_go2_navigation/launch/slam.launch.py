@@ -1,3 +1,10 @@
+"""Mapping: pointcloud_to_laserscan + slam_toolbox + RViz with a mapping view.
+
+Start the simulator first, in its own terminal (unitree_go2_sim unitree_go2_launch.py),
+let it settle, then launch this and drive with teleop. Save the map with
+`ros2 run nav2_map_server map_saver_cli -f <name>`.
+"""
+
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -10,18 +17,16 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
-    IncludeLaunchDescription,
     LogInfo,
     RegisterEventHandler,
+    TimerAction,
 )
+from launch.conditions import IfCondition
 from launch.events import matches_action
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
-    unitree_go2_sim = get_package_share_directory("unitree_go2_sim")
-    unitree_go2_description = get_package_share_directory("unitree_go2_description")
     unitree_go2_navigation = get_package_share_directory("unitree_go2_navigation")
 
     pointcloud_to_laserscan_config = os.path.join(
@@ -30,31 +35,10 @@ def generate_launch_description():
     slam_toolbox_config = os.path.join(
         unitree_go2_navigation, "config", "slam_toolbox.yaml"
     )
-    default_world = os.path.join(unitree_go2_description, "worlds", "default.sdf")
+    rviz_config = os.path.join(unitree_go2_navigation, "rviz", "slam_go2.rviz")
 
-    declare_gui = DeclareLaunchArgument(
-        "gui", default_value="true", description="Use gui"
-    )
     declare_rviz = DeclareLaunchArgument(
-        "rviz", default_value="true", description="Launch rviz"
-    )
-    declare_world = DeclareLaunchArgument(
-        "world",
-        default_value=default_world,
-        description="Gazebo world sdf path to forward to the sim",
-    )
-
-    # slam_toolbox owns map->odom here, so the sim must not also publish it.
-    sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(unitree_go2_sim, "launch", "unitree_go2_launch.py")
-        ),
-        launch_arguments={
-            "gui": LaunchConfiguration("gui"),
-            "rviz": LaunchConfiguration("rviz"),
-            "world": LaunchConfiguration("world"),
-            "disable_static_map_odom": "true",
-        }.items(),
+        "rviz", default_value="true", description="Open RViz with the mapping view"
     )
 
     pointcloud_to_laserscan_node = Node(
@@ -104,15 +88,25 @@ def generate_launch_description():
         )
     )
 
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        arguments=["-d", rviz_config],
+        parameters=[{"use_sim_time": True}],
+        output="screen",
+        condition=IfCondition(LaunchConfiguration("rviz")),
+    )
+
     return LaunchDescription(
         [
-            declare_gui,
             declare_rviz,
-            declare_world,
-            sim,
             pointcloud_to_laserscan_node,
             slam_toolbox_node,
             configure_slam_toolbox,
             activate_slam_toolbox,
+            # A few seconds after the nodes, so RViz does not start in the middle
+            # of their discovery.
+            TimerAction(period=5.0, actions=[rviz_node]),
         ]
     )
