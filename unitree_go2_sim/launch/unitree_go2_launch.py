@@ -9,8 +9,10 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
-    TimerAction,
+    LogInfo,
+    RegisterEventHandler,
 )
+from launch.event_handlers import OnProcessExit
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
@@ -303,48 +305,46 @@ def generate_launch_description():
         condition=UnlessCondition(LaunchConfiguration('disable_velodyne_lidar')),
     )
 
-    # Use spawner nodes directly to handle the configuration step. (load → configure → activate)
-    controller_spawner_js = TimerAction(
-        period=20.0,  # Wait for Gazebo to fully initialize
-        actions=[
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                output="screen",
-                arguments=[
-                    "--controller-manager-timeout", "120",  # Longer timeout
-                    "joint_states_controller",  # No --inactive flag to ensure full activation
-                ],
-            )
-        ]
+    # Controllers are spawned in a chain, each step starting when the previous one has
+    # finished, instead of on fixed 20 s / 30 s timers: robot spawned -> joint state
+    # broadcaster -> leg effort controller. The spawner itself waits for the
+    # controller manager, which the gz_ros2_control plugin loads with the robot.
+    controller_spawner_js = Node(
+        package="controller_manager",
+        executable="spawner",
+        output="screen",
+        arguments=["--controller-manager-timeout", "120", "joint_states_controller"],
     )
 
-    controller_spawner_effort = TimerAction(
-        period=30.0,  # Wait 5 seconds after joint_states_controller
-        actions=[
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                output="screen",
-                arguments=[
-                    "--controller-manager-timeout", "120",  # Longer timeout
-                    "joint_group_effort_controller",  # No --inactive flag to ensure full activation
-                ],
-            )
-        ]
+    controller_spawner_effort = Node(
+        package="controller_manager",
+        executable="spawner",
+        output="screen",
+        arguments=["--controller-manager-timeout", "120", "joint_group_effort_controller"],
     )
-    
-    # Shell script to manually check controller status 
-    controller_status_check = TimerAction(
-        period=25.0,  # Check status after controllers should be loaded
-        actions=[
-            ExecuteProcess(
-                cmd=["bash", "-c", "echo 'Checking controller status:' && ros2 control list_controllers"],
-                output='screen',
-            )
-        ]
+
+    controller_status_check = ExecuteProcess(
+        cmd=["bash", "-c", "echo 'Checking controller status:' && ros2 control list_controllers"],
+        output='screen',
     )
-    
+
+    spawn_controllers_after_robot = RegisterEventHandler(
+        OnProcessExit(target_action=gazebo_spawn_robot, on_exit=[controller_spawner_js])
+    )
+    spawn_effort_after_js = RegisterEventHandler(
+        OnProcessExit(target_action=controller_spawner_js, on_exit=[controller_spawner_effort])
+    )
+    report_ready = RegisterEventHandler(
+        OnProcessExit(
+            target_action=controller_spawner_effort,
+            on_exit=[
+                controller_status_check,
+                LogInfo(msg="[sim] Robot is up: leg controllers active. Give it a few "
+                            "seconds to stand, then start nav2.launch.py or slam.launch.py."),
+            ],
+        )
+    )
+
     return LaunchDescription(
         [
             # Launch arguments
@@ -392,10 +392,10 @@ def generate_launch_description():
             # Static TF publisher for frame connections
             map_to_odom_tf_node,
             
-            # Controller spawners that handle the complete lifecycle
-            controller_spawner_js,
-            controller_spawner_effort,
-            controller_status_check,
+            # Controller spawners, chained on the robot spawn (see above)
+            spawn_controllers_after_robot,
+            spawn_effort_after_js,
+            report_ready,
             
             # Visualization (only if rviz flag is set)
             rviz2,

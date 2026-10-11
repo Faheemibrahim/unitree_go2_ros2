@@ -4,8 +4,9 @@ Start the simulator first, in its own terminal (unitree_go2_sim unitree_go2_laun
 wait until it has settled (about 90 s), then launch this. The robot spawns at the map
 origin, which is where AMCL is seeded (config/nav2_params.yaml).
 
-The nodes and their order are the committed, tested ones (AMCL and Nav2 brought up
-together after a delay); only the simulator include and the SLAM mode were taken out.
+The nodes and parameters are the committed, tested ones; the simulator include and the
+SLAM mode were taken out. AMCL comes up first, then Nav2, then RViz, each started when
+the previous stage reports its nodes active.
 """
 
 import os
@@ -14,7 +15,13 @@ from ament_index_python.packages import get_package_share_directory
 from launch_ros.actions import Node
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+    TimerAction,
+)
+from launch.event_handlers import OnProcessIO
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
@@ -40,20 +47,16 @@ def generate_launch_description():
     declare_rviz = DeclareLaunchArgument(
         "rviz", default_value="true", description="Open RViz with the Nav2 view"
     )
-    # The scan conversion starts first so AMCL and the costmaps find /scan and a
-    # complete TF tree when they come up.
-    declare_nav2_delay = DeclareLaunchArgument(
-        "nav2_delay",
-        default_value="5.0",
-        description="Seconds to wait before bringing up AMCL and Nav2",
-    )
-    # Starting RViz while Nav2's nodes are still being discovered has saturated DDS
-    # on this machine (/clock stops reaching ROS, Nav2 stalls). In the tested runs RViz
-    # was started by hand after Nav2 was active, so it opens late here too.
-    declare_rviz_delay = DeclareLaunchArgument(
-        "rviz_delay",
-        default_value="25.0",
-        description="Seconds to wait before opening RViz, after Nav2 is up",
+    # The scan conversion starts first so AMCL finds /scan when it comes up. After that,
+    # each stage starts when the previous one reports "Managed nodes are active":
+    # AMCL + map_server -> Nav2 -> RViz. Starting the two lifecycle managers at the same
+    # instant occasionally dropped a lifecycle reply and stalled Nav2 half-configured,
+    # and starting RViz during Nav2's discovery is another known stall trigger. If a
+    # stage stalls, the next one (and RViz) never starts: relaunch.
+    declare_localization_delay = DeclareLaunchArgument(
+        "localization_delay",
+        default_value="3.0",
+        description="Seconds to wait before bringing up map_server and AMCL",
     )
 
     pointcloud_to_laserscan_node = Node(
@@ -142,6 +145,21 @@ def generate_launch_description():
         ),
     ]
 
+    def when_active(manager, actions):
+        """Start `actions` once, when lifecycle manager `manager` reports its nodes active."""
+        fired = []
+
+        def handler(event):
+            if fired:
+                return None
+            text = event.text.decode(errors="ignore")
+            if f"[{manager}]" in text and "Managed nodes are active" in text:
+                fired.append(True)
+                return actions
+            return None
+
+        return RegisterEventHandler(OnProcessIO(on_stdout=handler, on_stderr=handler))
+
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
@@ -156,14 +174,14 @@ def generate_launch_description():
         [
             declare_map,
             declare_rviz,
-            declare_nav2_delay,
-            declare_rviz_delay,
+            declare_localization_delay,
             pointcloud_to_laserscan_node,
             unmapped_obstacle_marker,
             TimerAction(
-                period=LaunchConfiguration("nav2_delay"),
-                actions=[localization] + nav2_nodes,
+                period=LaunchConfiguration("localization_delay"),
+                actions=[localization],
             ),
-            TimerAction(period=LaunchConfiguration("rviz_delay"), actions=[rviz_node]),
+            when_active("lifecycle_manager_localization", nav2_nodes),
+            when_active("lifecycle_manager_navigation", [rviz_node]),
         ]
     )

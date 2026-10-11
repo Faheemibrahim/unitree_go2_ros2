@@ -19,7 +19,6 @@ from launch.actions import (
     EmitEvent,
     LogInfo,
     RegisterEventHandler,
-    TimerAction,
 )
 from launch.conditions import IfCondition
 from launch.events import matches_action
@@ -98,6 +97,15 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("rviz")),
     )
 
+    # RViz opens once slam_toolbox is active, so the map and map->odom exist when it starts.
+    open_rviz_when_active = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=slam_toolbox_node,
+            goal_state="active",
+            entities=[rviz_node],
+        )
+    )
+
     return LaunchDescription(
         [
             declare_rviz,
@@ -105,8 +113,6 @@ def generate_launch_description():
             slam_toolbox_node,
             configure_slam_toolbox,
             activate_slam_toolbox,
-            # A few seconds after the nodes, so RViz does not start in the middle
-            # of their discovery.
-            TimerAction(period=5.0, actions=[rviz_node]),
+            open_rviz_when_active,
         ]
     )
