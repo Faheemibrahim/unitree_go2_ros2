@@ -11,7 +11,7 @@ There are three launch files, each started in its own terminal:
 | Mapping | `ros2 launch unitree_go2_navigation slam.launch.py` | slam_toolbox + RViz mapping view |
 | Navigation | `ros2 launch unitree_go2_navigation nav2.launch.py` | AMCL + Nav2 + RViz Nav2 view |
 
-Always start the simulator first and let it settle (about 90 s). Run **either** SLAM **or**
+Always start the simulator first and wait for its `[sim] Robot is up` line (about 15 s). Run **either** SLAM **or**
 Nav2, never both: each one owns the `map -> odom` transform.
 
 - Part 1 builds a map by driving the robot yourself.
@@ -65,8 +65,9 @@ ros2 launch unitree_go2_sim unitree_go2_launch.py
 ```
 
 Defaults: the maze world, Gazebo window on, no RViz, and no static `map -> odom` (slam_toolbox
-or AMCL owns it). Wait about 90 s, until the log shows `joint_group_effort_controller`
-configured and activated. Other worlds: `world:=/path/to/world.sdf`. No window: `gui:=false`.
+or AMCL owns it). The controllers are spawned one after another as each step finishes; wait
+for the line `[sim] Robot is up: leg controllers active` (about 15 s), then a few seconds for the
+robot to stand. Other worlds: `world:=/path/to/world.sdf`. No window: `gui:=false`.
 
 ### Terminal B: SLAM (after the simulator has settled)
 
@@ -74,7 +75,7 @@ configured and activated. Other worlds: `world:=/path/to/world.sdf`. No window: 
 ros2 launch unitree_go2_navigation slam.launch.py
 ```
 
-This also opens RViz with the mapping view. Add `rviz:=false` to leave it out. Restart only this
+This also opens RViz with the mapping view, as soon as slam_toolbox is active. Add `rviz:=false` to leave it out. Restart only this
 terminal after changing `slam_toolbox.yaml`.
 
 ### Terminal C: drive
@@ -110,7 +111,7 @@ Same as Part 1, Terminal A:
 ros2 launch unitree_go2_sim unitree_go2_launch.py
 ```
 
-Wait about 90 s for the controllers.
+Wait for `[sim] Robot is up` (about 15 s), then a few seconds for the robot to stand.
 
 ### Terminal B: Nav2 + AMCL on maze_world2, with RViz
 
@@ -118,8 +119,9 @@ Wait about 90 s for the controllers.
 ros2 launch unitree_go2_navigation nav2.launch.py
 ```
 
-Nav2 is ready in about 10-15 s. RViz opens by itself with the Nav2 view about 25 s after the
-launch, once Nav2 is up (`rviz:=false` to leave it out, `rviz_delay:=` to change the wait). The map defaults to `maze_world2.yaml`; use `map:=/path/to/other.yaml` for another map of the
+The stages start one after another, each when the previous one reports its nodes active:
+map_server + AMCL (3 s after the launch), then Nav2, then RViz with the Nav2 view. Everything is
+up in about 10 s (`rviz:=false` to leave RViz out). If RViz does not open, a stage stalled. The map defaults to `maze_world2.yaml`; use `map:=/path/to/other.yaml` for another map of the
 same world. Check it is ready:
 
 ```bash
@@ -128,7 +130,7 @@ ros2 lifecycle get /bt_navigator         # should be: active
 ```
 
 If the nodes stay `unconfigured`, Nav2 bringup stalled (a lifecycle reply was dropped under
-CPU load). Ctrl+C and relaunch, or raise `nav2_delay:=10.0`.
+CPU load). RViz will not open in that case. Ctrl+C and relaunch.
 
 ### Move the robot
 

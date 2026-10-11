@@ -32,7 +32,7 @@ Then start the pieces separately, each in its own terminal (open more with
 `~/go2_docker/run.sh shell` and source `~/ws/install/setup.bash` in each):
 
 ```bash
-# 1. the simulator (Gazebo only; maze world by default). Wait about 90 s.
+# 1. the simulator (Gazebo only; maze world by default). Wait for "[sim] Robot is up" (~15 s).
 ros2 launch unitree_go2_sim unitree_go2_launch.py
 
 # 2a. navigation on the saved map (AMCL + Nav2), opens RViz with the Nav2 view
@@ -46,9 +46,9 @@ Run either 2a or 2b, never both: each owns the `map -> odom` transform. Full
 paste-ready commands, saving a map, and where the map and world are set:
 [docs/COMMANDS.md](docs/COMMANDS.md).
 
-**Wait about 90 seconds after starting the simulator.** Gazebo has to spawn the
-robot and the controllers have to come up; errors printed during that
-window are normal. The stack is ready when `/clock` is advancing,
+**Wait for the simulator's `[sim] Robot is up` line** (about 15 s), then a few seconds
+for the robot to stand. Gazebo has to spawn the robot and the controllers have to
+come up; errors printed during that window are normal. The stack is ready when `/clock` is advancing,
 `/joint_states`, `/odom` and `/scan` are publishing, and
 `map -> odom -> base_footprint -> base_link` all resolve.
 
@@ -75,7 +75,7 @@ wall ends leave only a few centimetres of margin. See
 [Known limitations](#known-limitations). All of this is simulation only.
 
 Useful arguments: simulator `world:=/path/to/world.sdf`, `gui:=false`, `rviz:=true`;
-`nav2.launch.py` `map:=/path/to/map.yaml`, `rviz:=false`, `nav2_delay:=<s>`;
+`nav2.launch.py` `map:=/path/to/map.yaml`, `rviz:=false`, `localization_delay:=<s>`;
 `slam.launch.py` `rviz:=false`. A single maps directory,
 `unitree_go2_navigation/maps/`, holds the saved map; save new maps there and rebuild.
 
