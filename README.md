@@ -288,14 +288,19 @@ The `unitree_go2_navigation` package flattens the L1 4D lidar cloud into a
 | `unitree_go2_sim/launch/unitree_go2_launch.py` | The simulator alone: Gazebo, the robot and its controllers. Maze world by default |
 | `unitree_go2_navigation/launch/slam.launch.py` | Scan conversion + slam_toolbox, with RViz (mapping view). Drive with teleop |
 | `unitree_go2_navigation/launch/nav2.launch.py` | Scan conversion + AMCL on the saved map + Nav2 + the unmapped-obstacle node, with RViz (Nav2 view) |
+| `unitree_go2_navigation/launch/scan.launch.py` | Scan conversion alone (both launches above include it). View it with `unitree_go2_sim/rviz/lidar_check.rviz` |
 
 Start the simulator first, then **one** of the other two (each owns `map -> odom`).
 
-The lidar is mounted tilted, so the cloud is transformed into
-`base_footprint` before a height band is applied; filtering in the sensor
-frame would not mean "above the ground". Measured in `base_footprint` the
-ground sits near `-0.05 m`, so the band is `0.25 - 1.1 m`
-(`config/pointcloud_to_laserscan.yaml`).
+The simulated L1 matches the real one's mount and field of view
+([docs/L1_LIDAR_REALISM.md](docs/L1_LIDAR_REALISM.md)): under the chin, it
+sees only the half-sphere below its mounting face, tilted 15 deg forward. So
+walls appear in a 2D scan only in a thin band around the lidar's own height,
+and nothing behind the robot does. The scan conversion crops the robot's legs
+out of the cloud (`pcl_ros` crop box in `base_link`), then flattens a band
+from 10 cm above the floor to 5 cm above the lidar, out to 5 m, in
+`base_footprint` (`config/pointcloud_to_laserscan.yaml`). Both are stock C++
+nodes, so the same pipeline can run on the robot.
 
 ### TF ownership
 
@@ -343,12 +348,14 @@ margin. Measured in simulation only, not on the real robot. The older default
 world (`worlds/default.sdf`, five small obstacles, no saved map any more) gave
 0.3-2.1 m of goal error.
 
-**The simulated lidar cannot see anything closer than 0.8 m.** That is the
-simulated sensor's minimum range (Unitree's specification for the real L1 is
-0.05 m, so this is a gap in the simulation), and the robot is about 0.7 m long, so obstacles right
-against the robot are invisible. Costmap inflation is set to 0.70 m to
-compensate, but do not expect reliable avoidance of something that walks
-into the robot.
+**The 2D scan sees nothing behind the robot, and only near-level rays reach
+far.** That is the real L1's geometry, now simulated: its rays point down,
+so behind the robot they reach the floor within about 0.6 m. The simulated
+lidar used to have a 0.8 m minimum range, which Gazebo also uses as a near
+clip, so it saw through walls closer than about 0.46 m; it now has the real
+0.05 m blind zone. The sim robot stands lower than the real Go2 (lidar about
+0.15 m above the floor, against an estimated 0.23-0.27 m), so the scan band
+must move up with it once the real height is measured.
 
 **Starting RViz together with the simulator can break the stack.** DDS discovery
 saturates, `/clock` stops being delivered to ROS even though Gazebo keeps

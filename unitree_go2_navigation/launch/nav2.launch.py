@@ -1,4 +1,4 @@
-"""Navigation: pointcloud_to_laserscan + AMCL on a saved map + Nav2 + RViz with the Nav2 view.
+"""Navigation: lidar to /scan (scan.launch.py) + AMCL on a saved map + Nav2 + RViz with the Nav2 view.
 
 Start the simulator first, in its own terminal (unitree_go2_sim unitree_go2_launch.py),
 wait until it has settled (about 90 s), then launch this. The robot spawns at the map
@@ -31,9 +31,6 @@ def generate_launch_description():
     unitree_go2_navigation = get_package_share_directory("unitree_go2_navigation")
     nav2_bringup = get_package_share_directory("nav2_bringup")
 
-    pointcloud_to_laserscan_config = os.path.join(
-        unitree_go2_navigation, "config", "pointcloud_to_laserscan.yaml"
-    )
     nav2_params = os.path.join(unitree_go2_navigation, "config", "nav2_params.yaml")
     default_map = os.path.join(unitree_go2_navigation, "maps", "maze_world2.yaml")
     rviz_config = os.path.join(unitree_go2_navigation, "rviz", "nav2_go2.rviz")
@@ -59,16 +56,10 @@ def generate_launch_description():
         description="Seconds to wait before bringing up map_server and AMCL",
     )
 
-    pointcloud_to_laserscan_node = Node(
-        package="pointcloud_to_laserscan",
-        executable="pointcloud_to_laserscan_node",
-        name="pointcloud_to_laserscan",
-        output="screen",
-        parameters=[pointcloud_to_laserscan_config],
-        remappings=[
-            ("cloud_in", "/unitree_lidar/points"),
-            ("scan", "/scan"),
-        ],
+    scan = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(unitree_go2_navigation, "launch", "scan.launch.py")
+        )
     )
 
     # Gives obstacles that are not in the saved map an assumed size for the global
@@ -175,7 +166,7 @@ def generate_launch_description():
             declare_map,
             declare_rviz,
             declare_localization_delay,
-            pointcloud_to_laserscan_node,
+            scan,
             unmapped_obstacle_marker,
             TimerAction(
                 period=LaunchConfiguration("localization_delay"),

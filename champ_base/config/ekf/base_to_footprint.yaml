@@ -3,7 +3,13 @@ base_to_footprint_ekf:
     frequency: 50.0
     publish_tf: true
     transform_timeout: 0.01
-    transform_time_offset: 0.045
+    # Was 0.045. That stamps each tilt estimate 45 ms ahead, so a lookup at a lidar
+    # cloud's stamp returned the body tilt from 45 ms earlier: with the gait swaying
+    # +-3-4 deg, 3 deg wrong (95th pct) while walking, enough to lift floor returns
+    # 3 m ahead into the 2D scan band. At 0 the error is 0.2-0.35 deg (measured
+    # against /odom/ground_truth, nav_test_tools/tilt_check.py). Consumers wait for the
+    # transform instead (pointcloud_to_laserscan's transform_tolerance).
+    transform_time_offset: 0.0
     two_d_mode: false
 
     #x     , y     , z,

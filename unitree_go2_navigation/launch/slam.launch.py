@@ -1,4 +1,4 @@
-"""Mapping: pointcloud_to_laserscan + slam_toolbox + RViz with a mapping view.
+"""Mapping: lidar to /scan (scan.launch.py) + slam_toolbox + RViz with a mapping view.
 
 Start the simulator first, in its own terminal (unitree_go2_sim unitree_go2_launch.py),
 let it settle, then launch this and drive with teleop. Save the map with
@@ -17,20 +17,19 @@ from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
     EmitEvent,
+    IncludeLaunchDescription,
     LogInfo,
     RegisterEventHandler,
 )
 from launch.conditions import IfCondition
 from launch.events import matches_action
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
     unitree_go2_navigation = get_package_share_directory("unitree_go2_navigation")
 
-    pointcloud_to_laserscan_config = os.path.join(
-        unitree_go2_navigation, "config", "pointcloud_to_laserscan.yaml"
-    )
     slam_toolbox_config = os.path.join(
         unitree_go2_navigation, "config", "slam_toolbox.yaml"
     )
@@ -40,16 +39,10 @@ def generate_launch_description():
         "rviz", default_value="true", description="Open RViz with the mapping view"
     )
 
-    pointcloud_to_laserscan_node = Node(
-        package="pointcloud_to_laserscan",
-        executable="pointcloud_to_laserscan_node",
-        name="pointcloud_to_laserscan",
-        output="screen",
-        parameters=[pointcloud_to_laserscan_config],
-        remappings=[
-            ("cloud_in", "/unitree_lidar/points"),
-            ("scan", "/scan"),
-        ],
+    scan = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(unitree_go2_navigation, "launch", "scan.launch.py")
+        )
     )
 
     slam_toolbox_node = LifecycleNode(
@@ -109,7 +102,7 @@ def generate_launch_description():
     return LaunchDescription(
         [
             declare_rviz,
-            pointcloud_to_laserscan_node,
+            scan,
             slam_toolbox_node,
             configure_slam_toolbox,
             activate_slam_toolbox,

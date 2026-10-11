@@ -125,7 +125,7 @@ up in about 10 s (`rviz:=false` to leave RViz out). If RViz does not open, a sta
 same world. Check it is ready:
 
 ```bash
-ros2 topic hz /scan                      # about 8-10 Hz
+ros2 topic hz /scan                      # about 20 Hz
 ros2 lifecycle get /bt_navigator         # should be: active
 ```
 
@@ -187,7 +187,7 @@ To map something new, save into the same directory with a new name, for example
 ## Quick checks if something looks wrong
 
 ```bash
-ros2 topic hz /scan                                         # about 8-10 Hz
+ros2 topic hz /scan                                         # about 20 Hz
 ros2 lifecycle get /slam_toolbox                            # Part 1: active
 ros2 lifecycle get /bt_navigator                            # Part 2: active
 ros2 topic echo /foot_contacts --once                       # some entries true while walking
@@ -203,7 +203,11 @@ ros2 topic echo /odom --once --field pose.pose.position     # changes as the rob
   file is in `unitree_go2_navigation/maps/` (there is only that one maps directory).
 - Robot localizes badly or goals land off target: check `odom_scaler` in
   `unitree_go2_sim/config/gait/gait.yaml` first. Leg odometry that under-reports distance made
-  AMCL fall behind, which looked like a planning problem. AMCL's laser range is already set to
-  the L1's 30 m; the lidar cannot see closer than 0.8 m.
+  AMCL fall behind, which looked like a planning problem.
+- To see what the lidar and the 2D scan see, with only the simulator running:
+  `ros2 launch unitree_go2_navigation scan.launch.py`, then
+  `rviz2 -d $(ros2 pkg prefix unitree_go2_sim)/share/unitree_go2_sim/rviz/lidar_check.rviz --ros-args -p use_sim_time:=true`.
+  The scan has no returns behind the robot; that is the real L1's geometry
+  (docs/L1_LIDAR_REALISM.md).
 - Robot hugs or clips wall ends: the maze has 0.85 m gaps at wall ends and the body clears them
   by only a few cm. Slow tight curves are intended (`regulated_linear_scaling_min_radius`).

@@ -32,7 +32,7 @@ Visualization Manager:
     # The raw L1 cloud, coloured by height: what the sensor sees.
     - Class: rviz_default_plugins/PointCloud2
       Name: L1 raw cloud
-      Enabled: true
+      Enabled: false
       Topic:
         Value: /unitree_lidar/points
         Reliability Policy: Best Effort
@@ -50,7 +50,7 @@ Visualization Manager:
     # The cloud after the body crop box (step 2).
     - Class: rviz_default_plugins/PointCloud2
       Name: L1 cropped cloud
-      Enabled: false
+      Enabled: true
       Topic:
         Value: /unitree_lidar/points_cropped
         Reliability Policy: Best Effort

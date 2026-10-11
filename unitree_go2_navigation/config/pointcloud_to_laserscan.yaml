@@ -1,28 +1,56 @@
+# Lidar cloud to 2D /scan (launch/scan.launch.py). The L1 under the chin sees only
+# the half-sphere below its mounting face, tilted 15 deg forward
+# (docs/L1_LIDAR_REALISM.md section 5): ahead it reaches 15 deg above horizontal, to
+# the sides only level, and behind it looks at least 15 deg down. So walls show up
+# in a 2D scan only in a thin band around the lidar's own height.
+
+# Removes the robot's own legs, which the L1 sees just as the real one does. The box
+# is in base_link. Measured in sim standing and walking at 0.25 m/s, leg returns lie
+# within x 0.05..0.26, |y| <= 0.175, z -0.20..-0.13 (nav_test_tools/lidar_body.py);
+# the hind legs are outside the field of view. Margins of ~5-7 cm, and the box stops
+# short of the footprint's front edge (0.37) so a wall the nose nearly touches stays
+# visible. Re-check against a real bag: the real robot stands taller.
+body_crop:
+  ros__parameters:
+    use_sim_time: true
+    input_frame: base_link
+    negative: true            # drop the points inside the box, keep the rest
+    min_x: -0.45
+    max_x: 0.33
+    min_y: -0.22
+    max_y: 0.22
+    min_z: -0.40
+    max_z: 0.20
+    keep_organized: false
+
 pointcloud_to_laserscan:
   ros__parameters:
     use_sim_time: true
 
-    # Flatten into the gravity-aligned ground frame, not the sensor frame: the L1
-    # is mounted at roll 165 deg / yaw 90 deg, so a height band only means
-    # "above the ground" after this transform.
+    # Gravity-aligned ground frame, so the band means height above the floor.
     target_frame: base_footprint
     transform_tolerance: 0.1
 
-    # Band above the ground plane. Measured in this frame the ground sits at
-    # about -0.05 m, so 0.25 m leaves margin for the body pitching as it walks
-    # before ground returns would register as obstacles.
-    min_height: 0.25
-    max_height: 1.1
+    # A band from 10 cm above the floor to 5 cm above the lidar. Measured standing in
+    # this frame: floor -0.02, lidar 0.13 (nav_test_tools/lidar_check.py). Above the
+    # lidar only a forward wedge has data, and the lower edge keeps floor returns out
+    # (+-1 cm noise plus body pitch while walking). Both edges follow the lidar
+    # height: when the sim robot is raised to the real standing height, move them up
+    # by the same amount.
+    min_height: 0.08
+    max_height: 0.18
 
-    # Matches the sensor's 600 samples over a full revolution.
+    # 1 deg bins, the dense render's azimuth step.
     angle_min: -3.14159
     angle_max: 3.14159
-    angle_increment: 0.01047
-    scan_time: 0.1
+    angle_increment: 0.01745
+    scan_time: 0.05
 
-    # The sensor's own limits, from lidar_4D_lidar.xacro.
-    range_min: 0.8
-    range_max: 30.0
+    # Distances are horizontal, from base_footprint. The crop box already removed the
+    # body. Beyond 5 m the floor is the risk: a 1 deg tilt error lifts floor returns
+    # at 5 m by 9 cm, nearly into the band.
+    range_min: 0.1
+    range_max: 5.0
 
     use_inf: true
     inf_epsilon: 1.0
