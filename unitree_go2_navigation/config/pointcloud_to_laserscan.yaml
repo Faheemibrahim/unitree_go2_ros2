@@ -47,10 +47,16 @@ pointcloud_to_laserscan:
     scan_time: 0.05
 
     # Distances are horizontal, from base_footprint. The crop box already removed the
-    # body. Beyond 5 m the floor is the risk: a 1 deg tilt error lifts floor returns
-    # at 5 m by 9 cm, nearly into the band.
+    # body. The cap exists because floor returns drift into the band as a tilt error
+    # grows with distance: at 10 m the tilt error (0.2-0.35 deg, rarely 1.7) lifts
+    # them 3-6 cm (rarely 30 cm) against a 10 cm margin. Measured in a corridor
+    # (nav_test_tools/lidar_scan_check.py), walking at 0.25 m/s: 5 m cap 0.03% of scan
+    # points more than 0.15 m from any wall, 10 m cap 0.27%. At 15 m the check itself
+    # cannot tell leakage from ground-truth pose error. A 5 m cap also hid every
+    # wall farther than 5 m straight ahead (flat walls 4.3 m ahead lost the outer
+    # 24% of bearings, since their range at 30 deg exceeds 5 m).
     range_min: 0.1
-    range_max: 5.0
+    range_max: 10.0
 
     use_inf: true
     inf_epsilon: 1.0

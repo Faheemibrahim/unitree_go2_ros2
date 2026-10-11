@@ -298,7 +298,7 @@ sees only the half-sphere below its mounting face, tilted 15 deg forward. So
 walls appear in a 2D scan only in a thin band around the lidar's own height,
 and nothing behind the robot does. The scan conversion crops the robot's legs
 out of the cloud (`pcl_ros` crop box in `base_link`), then flattens a band
-from 10 cm above the floor to 5 cm above the lidar, out to 5 m, in
+from 10 cm above the floor to 5 cm above the lidar, out to 10 m, in
 `base_footprint` (`config/pointcloud_to_laserscan.yaml`). Both are stock C++
 nodes, so the same pipeline can run on the robot.
 
