@@ -1,0 +1,109 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Color: 160; 160; 164
+      Alpha: 0.4
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Alpha: 0.6
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        Depth: 5
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+      Show Names: true
+      Marker Scale: 0.3
+    # The raw L1 cloud, coloured by height: what the sensor sees.
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 raw cloud
+      Enabled: true
+      Topic:
+        Value: /unitree_lidar/points
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Style: Flat Squares
+      Size (m): 0.012
+      Alpha: 1
+      Color Transformer: AxisColor
+      Axis: Z
+      Use Fixed Frame: true
+      Autocompute Value Bounds: true
+      Decay Time: 0
+    # The cloud after the body crop box (step 2).
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 cropped cloud
+      Enabled: false
+      Topic:
+        Value: /unitree_lidar/points_cropped
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Style: Flat Squares
+      Size (m): 0.012
+      Alpha: 1
+      Color Transformer: FlatColor
+      Color: 0; 200; 255
+      Use Fixed Frame: true
+      Decay Time: 0
+    # The 2D scan that AMCL, slam_toolbox and the costmaps use.
+    - Class: rviz_default_plugins/LaserScan
+      Name: 2D scan
+      Enabled: true
+      Topic:
+        Value: /scan
+        Reliability Policy: Best Effort
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Depth: 5
+      Style: Spheres
+      Size (m): 0.04
+      Alpha: 1
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
+      Use Fixed Frame: true
+      Decay Time: 0
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_footprint
+    Frame Rate: 30
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Target Frame: base_footprint
+      Focal Point:
+        X: 0.5
+        Y: 0
+        Z: 0
+      Distance: 3.0
+      Pitch: 0.6
+      Yaw: 3.6
+      Near Clip Distance: 0.01
+Window Geometry:
+  Width: 1400
+  Height: 900
