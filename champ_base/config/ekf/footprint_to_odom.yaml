@@ -3,7 +3,13 @@ footprint_to_odom_ekf:
     frequency: 50.0
     publish_tf: true
     transform_timeout: 0.01
-    transform_time_offset: 0.050
+    # Was 0.050. Stamping each pose 50 ms ahead shifts the whole pose history by
+    # 50 ms. A single cloud is unaffected (into odom and back cancels), but lidar
+    # clouds merged over 0.3 s in odom were placed with that shifted history, and with
+    # the gait's yaw sway 4.9% of the merged in-band points landed more than 0.15 m
+    # from any wall while walking. At 0: 0.43% (nav_test_tools/band_truth.py).
+    # Consumers wait for the transform instead; the lidar arrives 50 ms late anyway.
+    transform_time_offset: 0.0
     two_d_mode: true
 
     #x     , y     , z,
