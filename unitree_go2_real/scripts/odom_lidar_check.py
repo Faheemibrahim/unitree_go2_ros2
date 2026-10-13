@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """How wrong is the Go2's odometry? Measured from the room itself (offline, from a bag).
 
-  ros2 run unitree_go2_real odom_lidar_check.py <bag_dir> [--selftest-only]
+  ros2 run unitree_go2_real odom_lidar_check.py <bag_dir> [--yaw-scale K] [--selftest-only]
 
 Idea: every time the robot stands still, the lidar sees the room. /utlidar/cloud_deskewed is
 already placed in the odom frame using the robot's own odometry. If odometry were perfect,
@@ -10,6 +10,10 @@ first one. So for each later still moment the walls are lined up with the first 
 walls (2D ICP: a rotation about the robot plus a shift). That rotation is the odometry's
 heading error at that moment, and the shift its position error, measured against the room,
 not against how far the drive was meant to turn.
+
+--yaw-scale K scores the corrected odometry instead of the robot's: heading change scaled
+by K, each step laid down along the corrected heading, every cloud moved with its pose
+(the same arithmetic as scripts/real_tf_bridge.py). K = 1 is the robot's data.
 
 Self-test first: two halves of the first still's clouds, one rotated and shifted by known
 amounts; the matcher must recover them. If it does not, no odometry number is printed.
@@ -71,6 +75,35 @@ def read(bag):
     o = o[np.argsort(o[:, 0])]
     o[:, 3] = np.unwrap(o[:, 3])
     return o, clouds
+
+
+def correct(o, clouds, k):
+    """Odometry rows (t, x, y, yaw) and clouds re-placed as real_tf_bridge.py does with
+    yaw_scale k. The tilt cancels in T_corrected * T_robot^-1, leaving a yaw rotation
+    about the robot's position plus a move to the corrected position."""
+    t, x, y, yaw = o.T
+    n = len(t)
+    cx, cy, cyaw = np.empty(n), np.empty(n), np.empty(n)
+    cx[0], cy[0], cyaw[0] = x[0], y[0], yaw[0]
+    for i in range(1, n):
+        dyaw = yaw[i] - yaw[i - 1]
+        mid = yaw[i - 1] + dyaw / 2
+        dx, dy = x[i] - x[i - 1], y[i] - y[i - 1]
+        bx = math.cos(-mid) * dx - math.sin(-mid) * dy
+        by = math.sin(-mid) * dx + math.cos(-mid) * dy
+        cmid = cyaw[i - 1] + k * dyaw / 2
+        cx[i] = cx[i - 1] + math.cos(cmid) * bx - math.sin(cmid) * by
+        cy[i] = cy[i - 1] + math.sin(cmid) * bx + math.cos(cmid) * by
+        cyaw[i] = cyaw[i - 1] + k * dyaw
+    out = []
+    for ts, P in clouds:
+        i = int(np.clip(np.searchsorted(t, ts), 1, n - 1))
+        i = i if abs(t[i] - ts) < abs(t[i - 1] - ts) else i - 1
+        d = cyaw[i] - yaw[i]
+        Q = P.astype(np.float64).copy()
+        Q[:, :2] = (P[:, :2] - [x[i], y[i]]) @ rot(d).T + [cx[i], cy[i]]
+        out.append((ts, Q))
+    return np.c_[t, cx, cy, cyaw], out
 
 
 def walls(points, centre):
@@ -187,6 +220,11 @@ def main():
         sys.exit(__doc__)
     bag = sys.argv[1]
     o, clouds = read(bag)
+    k = 1.0
+    if '--yaw-scale' in sys.argv:
+        k = float(sys.argv[sys.argv.index('--yaw-scale') + 1])
+        o, clouds = correct(o, clouds, k)
+        print(f'scoring CORRECTED odometry (yaw scale {k:.4f})')
     t, x, y, yaw = o.T
     runs = still_moments(t, x, y, yaw)
     print(f'{os.path.basename(bag.rstrip("/"))}: {len(clouds)} clouds, {len(runs)} still moments')

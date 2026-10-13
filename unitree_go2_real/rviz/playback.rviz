@@ -1,0 +1,159 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+  - Class: rviz_common/Time
+    Name: Time
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 30
+      Reference Frame: <Fixed Frame>
+    - Class: rviz_default_plugins/RobotModel
+      Name: Robot model (official go2_description, legs from /lowstate)
+      Enabled: true
+      Alpha: 1
+      Description Source: Topic
+      Description Topic:
+        Value: /robot_description
+        Depth: 1
+        Durability Policy: Transient Local
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz_default_plugins/TF
+      Name: TF (odom -> base_footprint -> base_link -> legs, utlidar_lidar)
+      Enabled: true
+      Show Names: false
+      Show Axes: true
+      Show Arrows: false
+      Marker Scale: 0.3
+      Frame Timeout: 15
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry trail (/go2/odom)
+      Enabled: true
+      Topic:
+        Value: /go2/odom
+        Depth: 5
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Keep: 800
+      Position Tolerance: 0.05
+      Angle Tolerance: 0.1
+      Shape:
+        Value: Arrow
+        Shaft Length: 0.15
+        Shaft Radius: 0.01
+        Head Length: 0.05
+        Head Radius: 0.03
+        Color: 255; 255; 0
+        Alpha: 1
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 cloud in odom (/go2/cloud_deskewed, 1 s decay)
+      Enabled: true
+      Topic:
+        Value: /go2/cloud_deskewed
+        Depth: 5
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Style: Points
+      Size (Pixels): 2
+      Color Transformer: AxisColor
+      Axis: Z
+      Decay Time: 1
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 raw, sensor frame (/go2/cloud)
+      Enabled: false
+      Topic:
+        Value: /go2/cloud
+        Depth: 5
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Style: Points
+      Size (Pixels): 3
+      Color Transformer: FlatColor
+      Color: 0; 255; 255
+      Decay Time: 0
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 in base_link (/go2/cloud_base)
+      Enabled: false
+      Topic:
+        Value: /go2/cloud_base
+        Depth: 5
+        Reliability Policy: Reliable
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Style: Points
+      Size (Pixels): 4
+      Color Transformer: FlatColor
+      Color: 255; 0; 255
+      Decay Time: 0
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/PointCloud2
+      Name: L1 cropped + merged 0.3 s (/l1_cloud_merged)
+      Enabled: false
+      Topic:
+        Value: /l1_cloud_merged
+        Depth: 5
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Style: Points
+      Size (Pixels): 2
+      Color Transformer: FlatColor
+      Color: 255; 170; 0
+      Decay Time: 0
+      Use Fixed Frame: true
+    - Class: rviz_default_plugins/LaserScan
+      Name: 2D scan (/scan)
+      Enabled: true
+      Topic:
+        Value: /scan
+        Depth: 5
+        Reliability Policy: Best Effort
+        History Policy: Keep Last
+        Durability Policy: Volatile
+      Style: Points
+      Size (Pixels): 5
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
+      Decay Time: 0
+      Use Fixed Frame: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Name: Current View
+      Target Frame: base_footprint
+      Distance: 7
+      Pitch: 0.9
+      Yaw: 3.6
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0
+Window Geometry:
+  Width: 1400
+  Height: 900

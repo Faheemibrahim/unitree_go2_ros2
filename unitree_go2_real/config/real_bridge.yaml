@@ -1,0 +1,12 @@
+# Parameters for scripts/real_tf_bridge.py.
+real_tf_bridge:
+  ros__parameters:
+    # The Go2's odometry heading over-counts rotation. Measured 2026-10-13 from the room itself
+    # (scripts/odom_lidar_check.py, walls at each still lined up with the first still):
+    #   odom_test_3 (net -1829 deg)  over-count 1.84 %, residual 0.08 deg rms over 5 stills
+    #   lab_walk_1  (net +367 deg)   over-count 1.94 %, residual 0.03 deg rms over 3 stills
+    # mean 1.89 %  ->  scale 1 / 1.0189 = 0.9814. Set 1.0 for the robot's data unchanged.
+    # Not a calibration of the robot: one lab, one firmware, Classic mode, one day.
+    yaw_scale: 0.9814
+    publish_raw: true        # also /go2/odom_raw and /go2/cloud_deskewed_raw
+    sensor_clouds: false     # /go2/cloud and /go2/cloud_base are not used by the mapping chain

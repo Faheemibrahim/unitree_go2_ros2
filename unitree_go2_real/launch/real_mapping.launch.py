@@ -33,6 +33,7 @@ from launch.substitutions import LaunchConfiguration
 def generate_launch_description():
     real = get_package_share_directory("unitree_go2_real")
     scan_config = os.path.join(real, "config", "pointcloud_to_laserscan.yaml")
+    bridge_config = os.path.join(real, "config", "real_bridge.yaml")
     slam_config = os.path.join(real, "config", "slam_toolbox.yaml")
     rviz_config = os.path.join(real, "rviz", "real_mapping.rviz")
 
@@ -53,7 +54,7 @@ def generate_launch_description():
 
     bridge = Node(
         package="unitree_go2_real", executable="real_tf_bridge.py",
-        name="real_tf_bridge", output="screen",
+        name="real_tf_bridge", output="screen", parameters=[bridge_config],
     )
     joint_states = Node(
         package="unitree_go2_real", executable="lowstate_joint_states.py",
