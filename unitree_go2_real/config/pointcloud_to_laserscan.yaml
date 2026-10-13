@@ -22,10 +22,15 @@ body_crop:
     input_frame: base_link
     output_frame: odom
     negative: true            # drop the points inside the box, keep the rest
-    min_x: -0.45
-    max_x: 0.33
-    min_y: -0.22
-    max_y: 0.22
+    # Real Go2, measured on lab_walk_1 (scripts/cloud_profile.py): in the scan band the
+    # body-fixed returns are two blobs at base_link x +0.1..+0.5, y -0.55..-0.3 and
+    # +0.25..+0.5 (about 2 points per cloud per cell, same place in every cloud), at
+    # 0.08-0.3 m above the floor; nothing inside |y| < 0.22. The sim's box (|y| < 0.22)
+    # missed them and they showed as a ring around the path in the 2D scan.
+    min_x: -0.15
+    max_x: 0.55
+    min_y: -0.55
+    max_y: 0.50
     min_z: -0.40
     max_z: 0.20
     keep_organized: false
