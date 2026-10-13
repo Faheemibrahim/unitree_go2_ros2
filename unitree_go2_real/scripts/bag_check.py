@@ -39,6 +39,28 @@ def stamp(h):
     return h.stamp.sec + h.stamp.nanosec * 1e-9
 
 
+def still_moments(t, x, y, yaw, min_s=STILL_S):
+    """(first, last) index pairs of the periods of at least min_s seconds where the body
+    moves under STILL_V and turns under STILL_W. Speeds come from poses ~0.2 s apart, so
+    single-message noise does not matter. yaw must be unwrapped."""
+    k = max(1, int(round(0.2 / np.median(np.diff(t)))))
+    v = np.hypot(x[k:] - x[:-k], y[k:] - y[:-k]) / (t[k:] - t[:-k])
+    w = np.abs(yaw[k:] - yaw[:-k]) / (t[k:] - t[:-k])
+    still = np.r_[(v < STILL_V) & (w < STILL_W), np.zeros(k, bool)]
+    runs, i = [], 0
+    while i < len(still):
+        if still[i]:
+            j = i
+            while j < len(still) and still[j]:
+                j += 1
+            if t[j - 1] - t[i] >= min_s:
+                runs.append((i, j - 1))
+            i = j
+        else:
+            i += 1
+    return runs
+
+
 def check(bag):
     meta = yaml.safe_load(open(os.path.join(bag, 'metadata.yaml')))['rosbag2_bagfile_information']
     dur = meta['duration']['nanoseconds'] * 1e-9
@@ -76,22 +98,7 @@ def check(bag):
         ct = np.sort(np.array(cloud_t))
         print(f'  cloud_deskewed: {len(ct)} msgs, largest stamp gap {np.diff(ct).max() * 1000:.0f} ms')
 
-    # speeds from positions over ~0.2 s, so single-message noise does not matter
-    k = max(1, int(round(0.2 / np.median(np.diff(t)))))
-    v = np.hypot(x[k:] - x[:-k], y[k:] - y[:-k]) / (t[k:] - t[:-k])
-    w = np.abs(yaw[k:] - yaw[:-k]) / (t[k:] - t[:-k])
-    still = np.r_[(v < STILL_V) & (w < STILL_W), np.zeros(k, bool)]
-    runs, i = [], 0
-    while i < len(still):
-        if still[i]:
-            j = i
-            while j < len(still) and still[j]:
-                j += 1
-            if t[j - 1] - t[i] >= STILL_S:
-                runs.append((i, j - 1))
-            i = j
-        else:
-            i += 1
+    runs = still_moments(t, x, y, yaw)
     path = np.sum(np.hypot(np.diff(x), np.diff(y)))
     turned = np.sum(np.abs(np.diff(yaw)))
     print(f'  odometry: travelled {path:.2f} m, turned {math.degrees(turned):.0f} deg in total '
