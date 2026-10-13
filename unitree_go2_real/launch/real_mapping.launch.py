@@ -71,11 +71,19 @@ def generate_launch_description():
         output="screen", parameters=[scan_config],
         remappings=[("input", "/go2/cloud_deskewed"), ("output", "/l1_cloud_cropped")],
     )
+    # Keep only the scan band before merging: ~99% of a real message is floor, and merging
+    # whole clouds made 1.8 MB messages that were dropped in transport (merged topic 5.6 Hz,
+    # gaps to 2.3 s, against 15 Hz in). z in odom is height above the floor.
+    band = Node(
+        package="pcl_ros", executable="filter_passthrough_node", name="band",
+        output="screen", parameters=[scan_config],
+        remappings=[("input", "/l1_cloud_cropped"), ("output", "/l1_cloud_band")],
+    )
     # Reused unchanged from the sim package: it only joins message bytes.
     cloud_accumulator = Node(
         package="unitree_go2_navigation", executable="cloud_accumulator.py",
         name="cloud_accumulator", output="screen", parameters=[scan_config],
-        remappings=[("input", "/l1_cloud_cropped"), ("output", "/l1_cloud_merged")],
+        remappings=[("input", "/l1_cloud_band"), ("output", "/l1_cloud_merged")],
     )
     pointcloud_to_laserscan = Node(
         package="pointcloud_to_laserscan", executable="pointcloud_to_laserscan_node",
@@ -122,6 +130,7 @@ def generate_launch_description():
         joint_states,
         robot_state_publisher,
         body_crop,
+        band,
         cloud_accumulator,
         pointcloud_to_laserscan,
         GroupAction(

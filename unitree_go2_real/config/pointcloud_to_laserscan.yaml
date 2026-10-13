@@ -35,6 +35,18 @@ body_crop:
     max_z: 0.20
     keep_organized: false
 
+# The scan band, applied to the cloud before it is merged (launch: body_crop -> band ->
+# cloud_accumulator). Same heights as pointcloud_to_laserscan below; z in odom is height
+# above the floor (odom z origin = floor, measured on lab_walk_1).
+band:
+  ros__parameters:
+    use_sim_time: false
+    filter_field_name: z
+    filter_limit_min: 0.08
+    filter_limit_max: 2.5
+    filter_limit_negative: false
+    keep_organized: false
+
 # One L1 message (~1,400 points, 12 sweeps) leaves 4-22 deg gaps in azimuth; ~0.3 s
 # (about 5 messages, 60 sweeps) fills them to a few degrees. Go2 users buffer the same
 # (docs/L1_LIDAR_REALISM.md sections 4.3 and 7). Longer smears moving obstacles.
