@@ -10,6 +10,7 @@ install(
 
 install(
   PROGRAMS scripts/real_tf_bridge.py scripts/record_bag.sh scripts/lowstate_joint_states.py
+           scripts/bag_check.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
