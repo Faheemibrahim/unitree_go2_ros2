@@ -5,6 +5,8 @@ the container with `~/go2_docker/run.sh real`, then:
 
   ros2 launch unitree_go2_real real_mapping.launch.py            # mapping
   ros2 launch unitree_go2_real real_mapping.launch.py slam:=false  # model, TF, cloud only
+  ros2 launch unitree_go2_real real_mapping.launch.py overrides:=<file.yaml>  # change one value
+    (see config/no_overrides.yaml; applied after the normal config of each node)
 
 Listen-only: nothing here sends commands to the robot. Drive with the Unitree remote.
 Save the map with `ros2 run nav2_map_server map_saver_cli -f <name>`.
@@ -49,12 +51,13 @@ def generate_launch_description():
         )
 
     slam = LaunchConfiguration("slam")
+    overrides = LaunchConfiguration("overrides")
     rviz = LaunchConfiguration("rviz")
     no_sim_time = {"use_sim_time": False}
 
     bridge = Node(
         package="unitree_go2_real", executable="real_tf_bridge.py",
-        name="real_tf_bridge", output="screen", parameters=[bridge_config],
+        name="real_tf_bridge", output="screen", parameters=[bridge_config, overrides],
     )
     joint_states = Node(
         package="unitree_go2_real", executable="lowstate_joint_states.py",
@@ -76,25 +79,25 @@ def generate_launch_description():
     # gaps to 2.3 s, against 15 Hz in). z in odom is height above the floor.
     band = Node(
         package="pcl_ros", executable="filter_passthrough_node", name="band",
-        output="screen", parameters=[scan_config],
+        output="screen", parameters=[scan_config, overrides],
         remappings=[("input", "/l1_cloud_cropped"), ("output", "/l1_cloud_band")],
     )
     # Reused unchanged from the sim package: it only joins message bytes.
     cloud_accumulator = Node(
         package="unitree_go2_navigation", executable="cloud_accumulator.py",
-        name="cloud_accumulator", output="screen", parameters=[scan_config],
+        name="cloud_accumulator", output="screen", parameters=[scan_config, overrides],
         remappings=[("input", "/l1_cloud_band"), ("output", "/l1_cloud_merged")],
     )
     pointcloud_to_laserscan = Node(
         package="pointcloud_to_laserscan", executable="pointcloud_to_laserscan_node",
-        name="pointcloud_to_laserscan", output="screen", parameters=[scan_config],
+        name="pointcloud_to_laserscan", output="screen", parameters=[scan_config, overrides],
         remappings=[("cloud_in", "/l1_cloud_merged"), ("scan", "/scan")],
     )
 
     slam_toolbox = LifecycleNode(
         package="slam_toolbox", executable="async_slam_toolbox_node",
         name="slam_toolbox", namespace="", output="screen",
-        parameters=[slam_config, {"use_lifecycle_manager": False}],
+        parameters=[slam_config, {"use_lifecycle_manager": False}, overrides],
     )
     configure_slam = EmitEvent(event=ChangeState(
         lifecycle_node_matcher=matches_action(slam_toolbox),
@@ -126,6 +129,9 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("slam", default_value="true", description="Run slam_toolbox"),
         DeclareLaunchArgument("rviz", default_value="true", description="Open RViz"),
+        DeclareLaunchArgument(
+            "overrides", default_value=os.path.join(real, "config", "no_overrides.yaml"),
+            description="Parameter file applied after each node's config (one run, one change)"),
         bridge,
         joint_states,
         robot_state_publisher,

@@ -12,6 +12,7 @@ install(
   PROGRAMS scripts/real_tf_bridge.py scripts/record_bag.sh scripts/lowstate_joint_states.py
            scripts/odom_check.py scripts/bag_check.py scripts/odom_lidar_check.py
            scripts/bridge_selftest.py scripts/cloud_profile.py scripts/merge_sweep.py
+           scripts/smear_check.py scripts/slam_track.py scripts/map_report.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

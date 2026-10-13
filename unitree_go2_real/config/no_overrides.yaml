@@ -1,0 +1,8 @@
+# Default for real_mapping.launch.py's `overrides` argument: changes nothing. A run that
+# changes one value passes its own file instead, e.g.
+#   real_tf_bridge:    {ros__parameters: {yaw_scale: 1.0}}
+#   cloud_accumulator: {ros__parameters: {window_s: 1.0}}
+#   slam_toolbox:      {ros__parameters: {use_scan_matching: false, do_loop_closing: false}}
+/**:
+  ros__parameters:
+    use_sim_time: false
