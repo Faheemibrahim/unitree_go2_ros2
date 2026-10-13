@@ -1,0 +1,90 @@
+# REAL ROBOT copy of unitree_go2_navigation/config/pointcloud_to_laserscan.yaml (sim file untouched).
+# Changed: use_sim_time false (PC clock; real_tf_bridge.py restamps the robot's data).
+# Sim-tuned values below are NOT yet checked on the real robot; comments are the sim's.
+
+# Lidar cloud to 2D /scan (launch/scan.launch.py). The L1 under the chin sees only
+# the half-sphere below its mounting face, tilted 15 deg forward
+# (docs/L1_LIDAR_REALISM.md section 5): ahead it reaches 15 deg above horizontal, to
+# the sides only level, and behind it looks at least 15 deg down. So walls show up
+# in a 2D scan only in a thin band around the lidar's own height.
+
+# Removes the robot's own legs, which the L1 sees just as the real one does. The box
+# is in base_link. Measured in sim standing and walking at 0.25 m/s, leg returns lie
+# within x 0.05..0.26, |y| <= 0.175, z -0.20..-0.13 (nav_test_tools/lidar_body.py);
+# the hind legs are outside the field of view. Margins of ~5-7 cm, and the box stops
+# short of the footprint's front edge (0.37) so a wall the nose nearly touches stays
+# visible. Re-check against a real bag: the real robot stands taller.
+# The input is in odom; each cloud is cropped in base_link at its own stamp, then put
+# back in odom for merging.
+body_crop:
+  ros__parameters:
+    use_sim_time: false
+    input_frame: base_link
+    output_frame: odom
+    negative: true            # drop the points inside the box, keep the rest
+    min_x: -0.45
+    max_x: 0.33
+    min_y: -0.22
+    max_y: 0.22
+    min_z: -0.40
+    max_z: 0.20
+    keep_organized: false
+
+# One L1 message (~1,400 points, 12 sweeps) leaves 4-22 deg gaps in azimuth; ~0.3 s
+# (about 5 messages, 60 sweeps) fills them to a few degrees. Go2 users buffer the same
+# (docs/L1_LIDAR_REALISM.md sections 4.3 and 7). Longer smears moving obstacles.
+cloud_accumulator:
+  ros__parameters:
+    # Works from message stamps only; subscribing to the sim clock (~1 kHz) cost
+    # half a core in rclpy for nothing.
+    use_sim_time: false
+    window_s: 0.3
+
+pointcloud_to_laserscan:
+  ros__parameters:
+    use_sim_time: false
+
+    # Gravity-aligned ground frame, so the band means height above the floor.
+    target_frame: base_footprint
+    transform_tolerance: 0.1
+
+    # A band from 10 cm above the floor to 5 cm above the lidar. Measured standing in
+    # this frame: floor -0.02, lidar 0.13 (nav_test_tools/lidar_check.py). Above the
+    # lidar only a forward wedge has data, and the lower edge keeps floor returns out
+    # (+-1 cm noise plus body pitch while walking). Both edges follow the lidar
+    # height: when the sim robot is raised to the real standing height, move them up
+    # by the same amount.
+    #
+    # Top edge: 2.5 m, not "lidar height + 5 cm". The forward fan sees far walls well
+    # above the lidar (15 deg up: 1.4 m high at 5 m ahead) and walls are vertical, so
+    # those points belong on the same wall line. Replaying one recorded mapping drive
+    # (nav_test_tools/replay_map.sh, 1x): band to 0.18 m: map precision 62% / recall 52%;
+    # band to 2.5 m: 73% / 65% at 10 m range, 82% / 70% at 15 m.
+    min_height: 0.08
+    max_height: 2.5
+
+    # 1 deg bins. One scan per lidar message (~15 Hz), each from the last 0.3 s.
+    angle_min: -3.14159
+    angle_max: 3.14159
+    angle_increment: 0.01745
+    scan_time: 0.0667
+
+    # Distances are horizontal, from base_footprint. The crop box already removed the
+    # body. The cap exists because floor returns drift into the band as a tilt error
+    # grows with distance: at 10 m the tilt error (0.2-0.35 deg, rarely 1.7) lifts
+    # them 3-6 cm (rarely 30 cm) against a 10 cm margin. Measured in a corridor
+    # (nav_test_tools/lidar_scan_check.py), walking at 0.25 m/s: 5 m cap 0.03% of scan
+    # points more than 0.15 m from any wall, 10 m cap 0.27%. At 15 m the check itself
+    # cannot tell leakage from ground-truth pose error. A 5 m cap also hid every
+    # wall farther than 5 m straight ahead (flat walls 4.3 m ahead lost the outer
+    # 24% of bearings, since their range at 30 deg exceeds 5 m).
+    # Replay, band to 2.5 m: 10 m range 73% / 65% map precision / recall, 15 m 82% / 70%,
+    # 20 m 36% / 32% (2x replay; slam_toolbox drops scans under load, +-6 points).
+    # Far corridor ends and junctions are what pin the position; floor leakage is the
+    # price (tilt error 0.3 deg is 8 cm at 15 m against the 8 cm floor margin).
+    range_min: 0.1
+    range_max: 15.0
+
+    use_inf: true
+    inf_epsilon: 1.0
+    queue_size: 10
