@@ -13,6 +13,8 @@ install(
            scripts/odom_check.py scripts/bag_check.py scripts/odom_lidar_check.py
            scripts/bridge_selftest.py scripts/cloud_profile.py scripts/merge_sweep.py
            scripts/smear_check.py scripts/slam_track.py scripts/map_report.py
+           scripts/sweep_truth.py scripts/traj_score.py scripts/odom_tums.py scripts/odom_to_tum.py
+           scripts/slam_tum.py scripts/kiss_icp_bag.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

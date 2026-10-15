@@ -36,7 +36,7 @@ def generate_launch_description():
     real = get_package_share_directory("unitree_go2_real")
     scan_config = os.path.join(real, "config", "pointcloud_to_laserscan.yaml")
     bridge_config = os.path.join(real, "config", "real_bridge.yaml")
-    slam_config = os.path.join(real, "config", "slam_toolbox.yaml")
+    slam_config = LaunchConfiguration("slam_config")
     rviz_config = os.path.join(real, "rviz", "real_mapping.rviz")
 
     # The official model's root link is `base`; the robot's odometry uses `base_link`.
@@ -71,7 +71,7 @@ def generate_launch_description():
 
     body_crop = Node(
         package="pcl_ros", executable="filter_crop_box_node", name="body_crop",
-        output="screen", parameters=[scan_config],
+        output="screen", parameters=[scan_config, overrides],
         remappings=[("input", "/go2/cloud_deskewed"), ("output", "/l1_cloud_cropped")],
     )
     # Keep only the scan band before merging: ~99% of a real message is floor, and merging
@@ -129,6 +129,9 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("slam", default_value="true", description="Run slam_toolbox"),
         DeclareLaunchArgument("rviz", default_value="true", description="Open RViz"),
+        DeclareLaunchArgument(
+            "slam_config", default_value=os.path.join(real, "config", "slam_toolbox.yaml"),
+            description="slam_toolbox parameter file (config/slam_stock.yaml = slam_toolbox's own defaults)"),
         DeclareLaunchArgument(
             "overrides", default_value=os.path.join(real, "config", "no_overrides.yaml"),
             description="Parameter file applied after each node's config (one run, one change)"),
