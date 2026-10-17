@@ -1,0 +1,75 @@
+# Point-LIO (CMU's point_lio_unilidar, from jizhang-cmu/autonomy_stack_go2) for the real Go2's built-in L1.
+# Inputs from scripts/lio_input.py (cloud and gyro both in base_link, accelerometer zero).
+# Values: CMU's config/utlidar.yaml plus the overrides in their mapping_utlidar.launch, except:
+#   con_frame 8   join 8 L1 messages (~0.5 s) per scan. Each message covers only a sweeping 100-150 deg
+#                 slice, too little for heading. Measured offline 2026-10-16, against the wall truth at
+#                 the stops: 8 -> 15/15 runs 0.02-0.11 m, < 1.3 deg (two tuning bags + held-out);
+#                 12 -> 6/6 alike; 5 -> 2/6 good; 3 -> 0/6; no IMU -> 60-200 m.
+#   topics, one odometry message per scan (publish_odometry_without_downsample false), no pcd.
+# extrinsic_T is CMU's (lidar in IMU, from Unitree's L1); here both inputs are in base_link, so it is
+# nearly zero anyway; kept as tested.
+/**:
+  ros__parameters:
+    use_sim_time: false
+    use_imu_as_input: false
+    prop_at_freq_of_imu: true
+    check_satu: true
+    init_map_size: 10
+    point_filter_num: 1
+    space_down_sample: true
+    filter_size_surf: 0.1
+    filter_size_map: 0.1
+    filter_size_surf_min: 0.2
+    filter_size_map_min: 0.2
+    cube_side_length: 1000.0
+    runtime_pos_log_enable: false
+    common:
+      lid_topic: /go2/lio_cloud
+      imu_topic: /go2/lio_imu
+      con_frame: true
+      con_frame_num: 8
+      cut_frame: false
+      cut_frame_time_interval: 0.1
+      time_lag_imu_to_lidar: 0.0
+    preprocess:
+      lidar_type: 5          # Unitree L1 point layout
+      scan_line: 18
+      timestamp_unit: 0      # seconds
+      blind: 0.5
+    mapping:
+      imu_en: true
+      start_in_aggressive_motion: false
+      extrinsic_est_en: false
+      imu_time_inte: 0.01
+      satu_acc: 30.0
+      satu_gyro: 35.0
+      acc_norm: 9.81
+      lidar_meas_cov: 0.01
+      acc_cov_output: 500.0
+      gyr_cov_output: 1000.0
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      imu_meas_acc_cov: 0.1
+      imu_meas_omg_cov: 0.1
+      gyr_cov_input: 0.01
+      acc_cov_input: 0.1
+      plane_thr: 0.1
+      match_s: 81.0
+      fov_degree: 180.0
+      det_range: 100.0
+      gravity_align: false
+      gravity: [0.0, 0.0, 0.0]
+      gravity_init: [0.0, 0.0, 0.0]
+      extrinsic_T: [0.007698, 0.014655, -0.00667]
+      extrinsic_R: [1.0, 0.0, 0.0,
+                    0.0, 1.0, 0.0,
+                    0.0, 0.0, 1.0]
+    odometry:
+      publish_odometry_without_downsample: false
+    publish:
+      path_en: false
+      scan_publish_en: true
+      scan_bodyframe_pub_en: false
+    pcd_save:
+      pcd_save_en: false
+      interval: -1

@@ -5,6 +5,7 @@ the container with `~/go2_docker/run.sh real`, then:
 
   ros2 launch unitree_go2_real real_mapping.launch.py            # mapping
   ros2 launch unitree_go2_real real_mapping.launch.py slam:=false  # model, TF, cloud only
+  ros2 launch unitree_go2_real real_mapping.launch.py lio:=true   # x, y, yaw from Point-LIO
   ros2 launch unitree_go2_real real_mapping.launch.py overrides:=<file.yaml>  # change one value
     (see config/no_overrides.yaml; applied after the normal config of each node)
 
@@ -15,6 +16,8 @@ Save the map with `ros2 run nav2_map_server map_saver_cli -f <name>`.
   /lowstate -> lowstate_joint_states -> /joint_states -> robot_state_publisher (go2_description)
   /go2/cloud_deskewed -> body_crop -> cloud_accumulator -> pointcloud_to_laserscan -> /scan
   /scan -> slam_toolbox -> /map, map -> odom
+  lio:=true  /utlidar/{cloud_deskewed,imu,robot_odom} -> lio_input -> Point-LIO (point_lio_unilidar,
+             config/point_lio_go2.yaml) -> /go2/lio_odom -> real_tf_bridge (pose_source lio)
 """
 
 import os
@@ -29,7 +32,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, EmitEvent, GroupAction, RegisterEventHandler
 from launch.conditions import IfCondition, UnlessCondition
 from launch.events import matches_action
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 
 def generate_launch_description():
@@ -55,9 +58,23 @@ def generate_launch_description():
     rviz = LaunchConfiguration("rviz")
     no_sim_time = {"use_sim_time": False}
 
+    lio = LaunchConfiguration("lio")
     bridge = Node(
         package="unitree_go2_real", executable="real_tf_bridge.py",
-        name="real_tf_bridge", output="screen", parameters=[bridge_config, overrides],
+        name="real_tf_bridge", output="screen",
+        parameters=[bridge_config,
+                    {"pose_source": PythonExpression(["'lio' if '", lio, "' == 'true' else 'robot'"])},
+                    overrides],
+    )
+    lio_input = Node(
+        package="unitree_go2_real", executable="lio_input.py", name="lio_input", output="screen",
+        parameters=[overrides], condition=IfCondition(lio),
+    )
+    point_lio = Node(
+        package="point_lio_unilidar", executable="pointlio_mapping", name="point_lio", output="screen",
+        parameters=[os.path.join(real, "config", "point_lio_go2.yaml")],
+        remappings=[("/aft_mapped_to_init", "/go2/lio_odom"), ("/cloud_registered", "/go2/lio_cloud_registered")],
+        condition=IfCondition(lio),
     )
     joint_states = Node(
         package="unitree_go2_real", executable="lowstate_joint_states.py",
@@ -129,13 +146,21 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument("slam", default_value="true", description="Run slam_toolbox"),
         DeclareLaunchArgument("rviz", default_value="true", description="Open RViz"),
+        DeclareLaunchArgument("lio", default_value="false",
+                              description="x, y, yaw from Point-LIO (needs point_lio_unilidar built)"),
         DeclareLaunchArgument(
-            "slam_config", default_value=os.path.join(real, "config", "slam_toolbox.yaml"),
-            description="slam_toolbox parameter file (config/slam_stock.yaml = slam_toolbox's own defaults)"),
+            "slam_config",
+            default_value=PythonExpression([
+                "'", os.path.join(real, "config", "slam_lio.yaml"), "' if '", LaunchConfiguration("lio"),
+                "' == 'true' else '", os.path.join(real, "config", "slam_toolbox.yaml"), "'"]),
+            description="slam_toolbox parameter file (default: config/slam_lio.yaml with lio:=true, else "
+                        "config/slam_toolbox.yaml; config/slam_stock.yaml = slam_toolbox's own defaults)"),
         DeclareLaunchArgument(
             "overrides", default_value=os.path.join(real, "config", "no_overrides.yaml"),
             description="Parameter file applied after each node's config (one run, one change)"),
         bridge,
+        lio_input,
+        point_lio,
         joint_states,
         robot_state_publisher,
         body_crop,

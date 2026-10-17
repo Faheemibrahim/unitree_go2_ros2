@@ -26,6 +26,17 @@ are untouched. Every deskewed cloud was placed in odom with the robot's pose at 
 it is moved by T_corrected * T_robot^-1 for that stamp (one 4x4 per cloud; points are not
 re-deskewed). yaw_scale 1.0 reproduces the robot's data exactly.
 
+pose_source 'lio' (measured 2026-10-16, see scripts/lio_input.py and config/point_lio_go2.yaml):
+x, y, yaw come from Point-LIO instead (/go2/lio_odom, robot stamps, one pose per ~0.5 s scan).
+It is used as a drift correction, like map -> odom: on each Point-LIO pose, M = LIO pose *
+robot pose^-1 at that stamp (planar, anchored so that the first LIO pose equals the robot's
+pose there), and every odometry message and cloud uses the latest M times the robot's own pose.
+So TF and clouds keep the robot's 150 Hz and no Point-LIO delay; each new M moves them by the
+robot's drift since the previous one (cm, tenths of a degree). Before the first Point-LIO pose
+M is identity (the robot's own data). A new M that differs from the last by more than
+lio_max_step_m / lio_max_step_deg is not used (logged): Point-LIO has diverged, and the last good
+M is kept. yaw_scale is ignored in this mode.
+
 Clock offset = the smallest (receive time - stamp) of robot_odom over the last
 offset_window_s: the least-delayed message is the best estimate, and the window follows
 slow drift between the two clocks. The cloud gets the same offset, since both stamps
@@ -80,6 +91,17 @@ def wrap(a):
     return (a + math.pi) % (2 * math.pi) - math.pi
 
 
+def compose(a, b):
+    """Planar poses (x, y, yaw): a * b."""
+    c, s = math.cos(a[2]), math.sin(a[2])
+    return (a[0] + c * b[0] - s * b[1], a[1] + s * b[0] + c * b[1], wrap(a[2] + b[2]))
+
+
+def inverse(a):
+    c, s = math.cos(a[2]), math.sin(a[2])
+    return (-c * a[0] - s * a[1], s * a[0] - c * a[1], -a[2])
+
+
 def stamp_ns(stamp):
     return stamp.sec * NS + stamp.nanosec
 
@@ -96,6 +118,14 @@ class RealTfBridge(Node):
         self.k = float(self.declare_parameter('yaw_scale', 1.0).value)
         publish_raw = bool(self.declare_parameter('publish_raw', True).value)
         sensor_clouds = bool(self.declare_parameter('sensor_clouds', False).value)
+        self.lio = self.declare_parameter('pose_source', 'robot').value == 'lio'
+        self.rob_t = collections.deque(maxlen=HISTORY)     # robot stamp ns, for placing LIO poses
+        self.rob_p = collections.deque(maxlen=HISTORY)     # robot (x, y, yaw)
+        self.lio_anchor = None                              # planar: odom <- LIO world
+        self.lio_M = (0.0, 0.0, 0.0)                        # planar: corrected <- robot
+        self.lio_max_m = float(self.declare_parameter('lio_max_step_m', 0.3).value)
+        self.lio_max_rad = math.radians(float(self.declare_parameter('lio_max_step_deg', 5.0).value))
+        self.lio_rejected = 0
         self.offset_ns = None
         self.recent = collections.deque()   # (receive ns, offset ns), offsets increasing
 
@@ -126,7 +156,11 @@ class RealTfBridge(Node):
                 pub = self.create_publisher(PointCloud2, dst, reliable)
                 self.create_subscription(PointCloud2, src, functools.partial(self.on_cloud_raw, pub),
                                          qos_profile_sensor_data, raw=True)
-        self.get_logger().info(f'yaw_scale {self.k:.4f}' + ('' if self.k != 1.0 else ' (robot data unchanged)'))
+        if self.lio:
+            self.create_subscription(Odometry, '/go2/lio_odom', self.on_lio, QoSProfile(depth=20, reliability=ReliabilityPolicy.RELIABLE))
+            self.get_logger().info('pose_source lio: x, y, yaw corrected by Point-LIO (/go2/lio_odom)')
+        else:
+            self.get_logger().info(f'yaw_scale {self.k:.4f}' + ('' if self.k != 1.0 else ' (robot data unchanged)'))
         self.publish_static()
 
     def publish_static(self):
@@ -163,7 +197,19 @@ class RealTfBridge(Node):
         q_tilt = quat_mul((0.0, 0.0, -q_yaw[2], q_yaw[3]), (q.x, q.y, q.z, q.w))
 
         # Corrected x, y, yaw (see the module docstring).
-        if self.prev is None or (self.hist_t and robot_ns < self.hist_t[-1] - NS):
+        restart = self.hist_t and robot_ns < self.hist_t[-1] - NS
+        if restart:
+            self.rob_t.clear()
+            self.rob_p.clear()
+            self.lio_anchor, self.lio_M = None, (0.0, 0.0, 0.0)
+        self.rob_t.append(robot_ns)
+        self.rob_p.append((p.x, p.y, yaw))
+        if self.lio:
+            self.cor = compose(self.lio_M, (p.x, p.y, yaw))
+            if restart:
+                self.hist_t.clear()
+                self.hist_T.clear()
+        elif self.prev is None or restart:
             self.prev, self.cor = (p.x, p.y, yaw), (p.x, p.y, yaw)
             self.hist_t.clear()
             self.hist_T.clear()
@@ -219,6 +265,34 @@ class RealTfBridge(Node):
         r = body.transform.rotation
         r.x, r.y, r.z, r.w = q_tilt
         self.tf.sendTransform([ground, body])
+
+    def on_lio(self, msg):
+        """New Point-LIO pose -> new planar correction M (see the module docstring)."""
+        t = stamp_ns(msg.header.stamp)
+        i = bisect.bisect_left(self.rob_t, t)
+        cand = [k for k in (i - 1, i) if 0 <= k < len(self.rob_t)]
+        if not cand:
+            return
+        k = min(cand, key=lambda k: abs(self.rob_t[k] - t))
+        if abs(self.rob_t[k] - t) > NS // 20:
+            return
+        q = msg.pose.pose.orientation
+        lio = (msg.pose.pose.position.x, msg.pose.pose.position.y,
+               math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)))
+        robot = self.rob_p[k]
+        if self.lio_anchor is None:
+            self.lio_anchor = compose(robot, inverse(lio))
+            self.get_logger().info('first Point-LIO pose: correction anchored')
+        M = compose(compose(self.lio_anchor, lio), inverse(robot))
+        # How far the new correction moves the robot's current pose relative to the old one.
+        step = compose(inverse(compose(self.lio_M, robot)), compose(M, robot))
+        if math.hypot(step[0], step[1]) > self.lio_max_m or abs(step[2]) > self.lio_max_rad:
+            self.lio_rejected += 1
+            self.get_logger().warn(
+                f'Point-LIO pose jumps {math.hypot(step[0], step[1]):.2f} m / {math.degrees(step[2]):.1f} deg '
+                f'against the last correction: not used ({self.lio_rejected} so far)', throttle_duration_sec=2.0)
+            return
+        self.lio_M = M
 
     def on_deskewed(self, msg):
         """Cloud in the robot's odom frame -> corrected odom frame, PC-time stamp."""
