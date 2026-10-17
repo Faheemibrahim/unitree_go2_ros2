@@ -4,7 +4,7 @@ project(unitree_go2_real)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY config launch rviz
+  DIRECTORY config launch rviz maps
   DESTINATION share/${PROJECT_NAME}
 )
 

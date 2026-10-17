@@ -1,0 +1,4 @@
+43d5f54 Wed Feb 18 18:10:57 2026 -0500
+from https://github.com/jizhang-cmu/autonomy_stack_go2 src/slam/point_lio_unilidar
+local change: C++14 -> C++17 in CMakeLists.txt (Jazzy rclcpp needs 17)
+local change: tf2 .h -> .hpp includes
