@@ -50,16 +50,25 @@ def generate_launch_description():
         y = yaml.safe_load(open(LaunchConfiguration("nav2_params").perform(context)))
         a = y["amcl"]["ros__parameters"]
         a["set_initial_pose"] = True
+        guard = LaunchConfiguration("guard").perform(context)
+        if guard == "full":
+            a["tf_broadcast"] = False        # the guard publishes map -> odom
         a["initial_pose"] = {"x": float(LaunchConfiguration("initial_x").perform(context)),
                              "y": float(LaunchConfiguration("initial_y").perform(context)), "z": 0.0,
                              "yaw": float(LaunchConfiguration("initial_yaw").perform(context))}
         f = tempfile.NamedTemporaryFile("w", suffix="_nav2_params.yaml", delete=False)
         yaml.safe_dump(y, f)
         f.close()
-        return [IncludeLaunchDescription(
+        actions = [IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(nav2_bringup, "launch", "localization_launch.py")),
             launch_arguments={"map": LaunchConfiguration("map"), "use_sim_time": "false",
                               "params_file": f.name}.items())]
+        if guard != "off":
+            actions.append(Node(package="unitree_go2_real", executable="localization_guard.py", name="localization_guard",
+                                output="screen",   # its tuning: the localization_guard section of nav2_params
+                                parameters=[f.name, {"mode": guard, "scan_topic": a.get("scan_topic", "scan"),
+                                                     "log_file": LaunchConfiguration("guard_log").perform(context)}]))
+        return actions
 
     common = {"parameters": [nav2_params, {"use_sim_time": False}], "output": "screen"}
     to_cmd_vel_nav = [("cmd_vel", "cmd_vel_nav")]
@@ -112,6 +121,10 @@ def generate_launch_description():
         DeclareLaunchArgument("initial_x", default_value="0.0", description="AMCL start pose on the map (m)"),
         DeclareLaunchArgument("initial_y", default_value="0.0", description="AMCL start pose on the map (m)"),
         DeclareLaunchArgument("initial_yaw", default_value="0.0", description="AMCL start heading on the map (rad)"),
+        DeclareLaunchArgument("guard", default_value="full", choices=["off", "passive", "reseed", "full"],
+                              description="localization_guard.py: off / passive (log only) / reseed (re-seeds AMCL) / "
+                                          "full (also holds map -> odom where the scan does not match the map)"),
+        DeclareLaunchArgument("guard_log", default_value="", description="localization_guard.py per-scan log file"),
         DeclareLaunchArgument("localization_delay", default_value="8.0",
                               description="Seconds before map_server + AMCL start (Point-LIO and /scan come up first)"),
         robot,

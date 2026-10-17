@@ -31,6 +31,12 @@
 #     on, rays to the wall behind an obstacle that came that close erased it from the costmap just before contact.
 #   2026-10-17, operator: inflation and footprint margin back to the SIM's values (local 0.70 m / scaling 3.0, global
 #     1.0 m / 2.0, no footprint_padding). Kept from the real-robot fixes: /scan_nav, inf_is_valid, raytrace_min_range 1.0.
+#   2026-10-18, AMCL went haywire where objects not in the map (cardboard) hid the walls: localization_guard (section
+#     below, launch guard:=full, the default) publishes map -> odom instead of AMCL (amcl tf_broadcast is set false by the
+#     launch). It follows AMCL within a drift budget, ignores AMCL jumps and re-seeds AMCL. Replays of cardboard_walk_1 on
+#     maps/lab_dense (no cardboard in it), 2 runs each, vs the Point-LIO path: median 0.44 -> 0.13 m, worst 5.1 -> 0.5 m,
+#     time > 0.5 m off 47 -> 0.1 %, in the cardboard stretches 88 -> 0 %; bench_walk_1 (no clutter) 0.16 -> 0.13 m. No AMCL
+#     setting alone helped (beam skip, z mix, update rate, recovery alphas, particles, alpha 0.1, sigma_hit).
 # Footprint (0.74 x 0.35 m) and inflation are the sim's; speeds and controller limits as listed above.
 amcl:
   ros__parameters:
@@ -73,6 +79,23 @@ amcl:
     scan_topic: scan
     set_initial_pose: false
     initial_pose: {x: 0.0, y: 0.0, z: 0.0, yaw: 0.0}
+localization_guard:
+  ros__parameters:
+    # Drift budget: how fast map -> odom may follow AMCL. Point-LIO's true drift: p95 3.5 cm/s, 0.16 deg/s.
+    follow_v: 0.02
+    follow_w_deg: 0.2
+    # For 20 s after a start pose / "2D Pose Estimate" the budget is 0.10 m/s, 1 deg/s: a pose up to ~0.5 m / 10 deg off is
+    # corrected; 1 m / 20 deg is not.
+    settle_s: 20.0
+    settle_v: 0.10
+    settle_w_deg: 1.0
+    # AMCL further than this from the held pose is not followed; after reseed_after_s it is re-seeded to the held pose.
+    diverge_dist: 0.6
+    diverge_yaw_deg: 8.0
+    reseed_after_s: 3.0
+    reseed_cooldown_s: 3.0
+    # Big corrections from the scan score are off: in the lab a wrong pose often matches the map as well as the right one.
+    big_corrections: "off"
 bt_navigator:
   ros__parameters:
     global_frame: map

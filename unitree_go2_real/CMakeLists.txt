@@ -15,6 +15,7 @@ install(
            scripts/smear_check.py scripts/slam_track.py scripts/map_report.py
            scripts/sweep_truth.py scripts/traj_score.py scripts/odom_tums.py scripts/odom_to_tum.py
            scripts/slam_tum.py scripts/kiss_icp_bag.py scripts/lio_input.py scripts/go2_cmd_bridge.py
+           scripts/localization_guard.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
