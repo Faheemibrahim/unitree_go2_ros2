@@ -33,6 +33,26 @@ body_crop:
     max_y: 0.50
     min_z: -0.40
     max_z: 0.20
+
+# The L1's near-field artifact ahead of the head ("ghost obstacles" in Nav2's costmap). Measured 2026-10-17, live and on a
+# replay of lab_map_lio_f (nav_test_tools/ghost_live.py, ghost_offline.py, nearfield_check.py): while walking, points
+# 0.6-0.8 m ahead of the body centre, about 0.25 m above the floor, that move WITH the robot (same robot-frame spot while
+# walking and turning: not in the room); raw range from the lidar 0.35-0.65 m (5-95 %), normal intensity. 5.4 % of the
+# points near the robot while walking were such ghosts (0.4 % standing). Unitree's own clouds keep them. This box removes
+# that zone: a real object closer than ~0.6 m in front of the nose is not in the 2D scan at that moment (it was seen
+# from further away and stays in the costmap).
+near_crop:
+  ros__parameters:
+    use_sim_time: false
+    input_frame: base_link
+    output_frame: odom
+    negative: true
+    min_x: 0.55
+    max_x: 0.95
+    min_y: -0.50
+    max_y: 0.50
+    min_z: -0.40
+    max_z: 0.15
     keep_organized: false
 
 # The scan band, applied to the cloud before it is merged (launch: body_crop -> band ->
@@ -55,7 +75,10 @@ cloud_accumulator:
     # Works from message stamps only; subscribing to the sim clock (~1 kHz) cost
     # half a core in rclpy for nothing.
     use_sim_time: false
-    window_s: 0.3
+    # 0.5 s: best of 0 / 0.1 / 0.2 / 0.3 / 0.5 / 1.0 s in the 2026-10-16 sweep (each against the plain baseline,
+    # 3 runs x 2 tuning bags, error at the stops against the walls; score 0.16 = about 1/6 of the baseline's
+    # error, 6/6 runs better than the baseline's middle run), and held on the held-out bag.
+    window_s: 0.5
 
 pointcloud_to_laserscan:
   ros__parameters:
@@ -103,5 +126,27 @@ pointcloud_to_laserscan:
     range_max: 15.0
 
     use_inf: true
+    inf_epsilon: 1.0
+    queue_size: 10
+
+# Second scan, for Nav2's costmaps and collision monitor only (/scan_nav; /scan above stays as it is, for AMCL).
+# 2026-10-17, live: ghost "particles" in the local costmap. After near_crop the remaining ghosts were floor-level specks
+# (median 0.09 m, just above /scan's 0.08 m edge; replay of lab_map_lio_f, nav_test_tools/ghost_offline.py). Obstacles
+# for a Go2 start at 0.15 m (lower things it can step over or the floor), and nothing above 0.7 m touches the robot
+# (body top ~0.45 m, table tops are passed under). Short range: costmap marking only needs the near field.
+pointcloud_to_laserscan_nav:
+  ros__parameters:
+    use_sim_time: false
+    target_frame: base_footprint
+    transform_tolerance: 0.1
+    min_height: 0.15
+    max_height: 0.70
+    angle_min: -3.14159
+    angle_max: 3.14159
+    angle_increment: 0.01745
+    scan_time: 0.0667
+    range_min: 0.1
+    range_max: 5.0
+    use_inf: true            # no return -> inf: the costmap clears along that whole ray (inf_is_valid)
     inf_epsilon: 1.0
     queue_size: 10

@@ -14,7 +14,7 @@ Save the map with `ros2 run nav2_map_server map_saver_cli -f <name>`.
 
   /utlidar/robot_odom, /utlidar/cloud_deskewed -> real_tf_bridge (TF, PC-time stamps)
   /lowstate -> lowstate_joint_states -> /joint_states -> robot_state_publisher (go2_description)
-  /go2/cloud_deskewed -> body_crop -> cloud_accumulator -> pointcloud_to_laserscan -> /scan
+  /go2/cloud_deskewed -> body_crop -> near_crop -> band -> cloud_accumulator -> pointcloud_to_laserscan -> /scan
   /scan -> slam_toolbox -> /map, map -> odom
   lio:=true  /utlidar/{cloud_deskewed,imu,robot_odom} -> lio_input -> Point-LIO (point_lio_unilidar,
              config/point_lio_go2.yaml) -> /go2/lio_odom -> real_tf_bridge (pose_source lio)
@@ -89,7 +89,13 @@ def generate_launch_description():
     body_crop = Node(
         package="pcl_ros", executable="filter_crop_box_node", name="body_crop",
         output="screen", parameters=[scan_config, overrides],
-        remappings=[("input", "/go2/cloud_deskewed"), ("output", "/l1_cloud_cropped")],
+        remappings=[("input", "/go2/cloud_deskewed"), ("output", "/l1_cloud_body_cropped")],
+    )
+    # The L1's near-field artifact ahead of the head (ghost obstacles): see config/pointcloud_to_laserscan.yaml near_crop.
+    near_crop = Node(
+        package="pcl_ros", executable="filter_crop_box_node", name="near_crop",
+        output="screen", parameters=[scan_config, overrides],
+        remappings=[("input", "/l1_cloud_body_cropped"), ("output", "/l1_cloud_cropped")],
     )
     # Keep only the scan band before merging: ~99% of a real message is floor, and merging
     # whole clouds made 1.8 MB messages that were dropped in transport (merged topic 5.6 Hz,
@@ -109,6 +115,13 @@ def generate_launch_description():
         package="pointcloud_to_laserscan", executable="pointcloud_to_laserscan_node",
         name="pointcloud_to_laserscan", output="screen", parameters=[scan_config, overrides],
         remappings=[("cloud_in", "/l1_cloud_merged"), ("scan", "/scan")],
+    )
+
+    # Nav2's obstacle scan: 0.15-0.70 m above the floor, 5 m (config/pointcloud_to_laserscan.yaml, pointcloud_to_laserscan_nav).
+    pointcloud_to_laserscan_nav = Node(
+        package="pointcloud_to_laserscan", executable="pointcloud_to_laserscan_node",
+        name="pointcloud_to_laserscan_nav", output="screen", parameters=[scan_config, overrides],
+        remappings=[("cloud_in", "/l1_cloud_merged"), ("scan", "/scan_nav")],
     )
 
     slam_toolbox = LifecycleNode(
@@ -164,9 +177,11 @@ def generate_launch_description():
         joint_states,
         robot_state_publisher,
         body_crop,
+        near_crop,
         band,
         cloud_accumulator,
         pointcloud_to_laserscan,
+        pointcloud_to_laserscan_nav,
         GroupAction(
             [slam_toolbox, configure_slam, activate_slam, open_rviz_when_active],
             condition=IfCondition(slam),
